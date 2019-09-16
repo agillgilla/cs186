@@ -1,6 +1,7 @@
 package edu.berkeley.cs186.database.concurrency;
 
 import edu.berkeley.cs186.database.TransactionContext;
+import edu.berkeley.cs186.database.common.Pair;
 
 /**
  * A lock context that doesn't do anything at all. Used where a lock context
@@ -8,33 +9,40 @@ import edu.berkeley.cs186.database.TransactionContext;
  */
 public class DummyLockContext extends LockContext {
     public DummyLockContext() {
-        this(null);
+        this((LockContext) null);
     }
 
     public DummyLockContext(LockContext parent) {
-        super(new DummyLockManager(), parent, null);
+        super(new DummyLockManager(), parent, new Pair<>("Unnamed", -1L));
+    }
+
+    public DummyLockContext(Pair<String, Long> name) {
+        this(null, name);
+    }
+
+    public DummyLockContext(LockContext parent, Pair<String, Long> name) {
+        super(new DummyLockManager(), parent, name);
     }
 
     @Override
-    public void acquire(TransactionContext transaction, LockType lockType)
-    throws InvalidLockException, DuplicateLockRequestException { }
+    public void acquire(TransactionContext transaction, LockType lockType) { }
 
     @Override
-    public void release(TransactionContext transaction)
-    throws NoLockHeldException, InvalidLockException { }
+    public void release(TransactionContext transaction) { }
 
     @Override
-    public void promote(TransactionContext transaction, LockType newLockType)
-    throws DuplicateLockRequestException, NoLockHeldException, InvalidLockException { }
+    public void promote(TransactionContext transaction, LockType newLockType) { }
 
     @Override
-    public void escalate(TransactionContext transaction) throws NoLockHeldException { }
+    public void escalate(TransactionContext transaction) { }
 
     @Override
     public void disableChildLocks() { }
 
     @Override
-    public LockContext childContext(String readable, long name) { return new DummyLockContext(this); }
+    public LockContext childContext(String readable, long name) {
+        return new DummyLockContext(this, new Pair<>(readable, name));
+    }
 
     @Override
     public int capacity() {
@@ -62,7 +70,7 @@ public class DummyLockContext extends LockContext {
 
     @Override
     public String toString() {
-        return "Dummy Lock Context";
+        return "Dummy Lock Context(\" + name.toString() + \")";
     }
 }
 

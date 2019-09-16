@@ -92,7 +92,8 @@ public class DiskSpaceManagerImpl implements DiskSpaceManager {
             try {
                 this.file = new RandomAccessFile(fileName, "rw");
                 this.fileChannel = this.file.getChannel();
-                if (this.file.length() == 0) {
+                long length = this.file.length();
+                if (length == 0) {
                     // new file, write empty master page and fill headerPages with null
                     for (int i = 0; i < MAX_HEADER_PAGES; ++i) {
                         this.headerPages.add(null);
@@ -105,7 +106,7 @@ public class DiskSpaceManagerImpl implements DiskSpaceManager {
                     b.position(0);
                     for (int i = 0; i < MAX_HEADER_PAGES; ++i) {
                         this.masterPage[i] = (b.getShort() & 0xFFFF);
-                        if (this.masterPage[i] == 0) {
+                        if (PartInfo.headerPageOffset(i) >= length) {
                             this.headerPages.add(null);
                         } else {
                             byte[] headerPage = new byte[PAGE_SIZE];
@@ -210,8 +211,8 @@ public class DiskSpaceManagerImpl implements DiskSpaceManager {
                                         pageIndex + ") already allocated");
             }
 
-            ++this.masterPage[headerIndex];
             Bits.setBit(headerBytes, pageIndex, Bits.Bit.ONE);
+            this.masterPage[headerIndex] = Bits.countBits(headerBytes);
 
             int pageNum = pageIndex + headerIndex * DATA_PAGES_PER_HEADER;
 
@@ -235,10 +236,6 @@ public class DiskSpaceManagerImpl implements DiskSpaceManager {
             int headerIndex = pageNum / DATA_PAGES_PER_HEADER;
             int pageIndex = pageNum % DATA_PAGES_PER_HEADER;
 
-            if (this.masterPage[headerIndex] == DATA_PAGES_PER_HEADER) {
-                throw new PageException("cannot free unallocated page");
-            }
-
             byte[] headerBytes = headerPages.get(headerIndex);
             if (headerBytes == null) {
                 throw new PageException("cannot free unallocated page");
@@ -249,8 +246,7 @@ public class DiskSpaceManagerImpl implements DiskSpaceManager {
             }
 
             Bits.setBit(headerBytes, pageIndex, Bits.Bit.ONE);
-            --masterPage[headerIndex];
-            Bits.setBit(headerBytes, pageIndex, Bits.Bit.ONE);
+            this.masterPage[headerIndex] = Bits.countBits(headerBytes);
 
             TransactionContext transaction = TransactionContext.getTransaction();
             if (transaction != null) {
@@ -321,7 +317,7 @@ public class DiskSpaceManagerImpl implements DiskSpaceManager {
          * @return offset in OS file for header page
          */
         private static long headerPageOffset(int headerIndex) {
-            return (1 + headerIndex * DATA_PAGES_PER_HEADER) * PAGE_SIZE;
+            return (long) (1 + headerIndex * DATA_PAGES_PER_HEADER) * PAGE_SIZE;
         }
 
         /**
@@ -329,7 +325,7 @@ public class DiskSpaceManagerImpl implements DiskSpaceManager {
          * @return offset in OS file for data page
          */
         private static long dataPageOffset(int pageNum) {
-            return (2 + pageNum / DATA_PAGES_PER_HEADER + pageNum) * PAGE_SIZE;
+            return (long) (2 + pageNum / DATA_PAGES_PER_HEADER + pageNum) * PAGE_SIZE;
         }
 
         private void freeDataPages() throws IOException {
@@ -371,6 +367,12 @@ public class DiskSpaceManagerImpl implements DiskSpaceManager {
                 throw new PageException("could not initialize disk space manager - directory is a file");
             }
             for (File f : files) {
+                if (f.length() == 0) {
+                    if (!f.delete()) {
+                        throw new PageException("could not clean up unused file - " + f.getName());
+                    }
+                    continue;
+                }
                 int fileNum = Integer.parseInt(f.getName());
                 maxFileNum = Math.max(maxFileNum, fileNum);
                 this.partInfo.put(fileNum, new PartInfo(dbDir + "/" + f.getName(), fileNum, recoveryManager));

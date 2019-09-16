@@ -6,14 +6,18 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.function.Supplier;
 
 import edu.berkeley.cs186.database.TimeoutScaling;
 import edu.berkeley.cs186.database.concurrency.DummyLockContext;
 import edu.berkeley.cs186.database.concurrency.LockContext;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
+import edu.berkeley.cs186.database.io.MemoryDiskSpaceManager;
 import edu.berkeley.cs186.database.memory.BufferManager;
+import edu.berkeley.cs186.database.memory.BufferManagerImpl;
+import edu.berkeley.cs186.database.memory.ClockEvictionPolicy;
 import edu.berkeley.cs186.database.memory.Page;
-import edu.berkeley.cs186.database.memory.UnbackedBufferManager;
+import edu.berkeley.cs186.database.recovery.DummyRecoveryManager;
 import org.junit.*;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.DisableOnDebug;
@@ -35,6 +39,12 @@ public class TestBPlusTree {
     private BPlusTreeMetadata metadata;
     private LockContext treeContext;
 
+    // max 5 I/Os per iterator creation default
+    private static final int MAX_IO_PER_ITER_CREATE = 5;
+
+    // max 1 I/Os per iterator next, unless overridden
+    private static final int MAX_IO_PER_NEXT = 1;
+
     // 3 seconds max per method tested.
     @Rule
     public TestRule globalTimeout = new DisableOnDebug(Timeout.millis((long) (
@@ -42,7 +52,10 @@ public class TestBPlusTree {
 
     @Before
     public void setup()  {
-        this.bufferManager = new UnbackedBufferManager();
+        DiskSpaceManager diskSpaceManager = new MemoryDiskSpaceManager();
+        diskSpaceManager.allocPart(0);
+        this.bufferManager = new BufferManagerImpl(diskSpaceManager, new DummyRecoveryManager(), 1024,
+                new ClockEvictionPolicy());
         this.treeContext = new DummyLockContext();
         this.metadata = null;
     }
@@ -63,12 +76,45 @@ public class TestBPlusTree {
         return new BPlusTree(bufferManager, metadata, treeContext);
     }
 
-    private static <T> List<T> iteratorToList(Iterator<T> iter) {
+    // the 0th item in maxIOsOverride specifies how many I/Os constructing the iterator may take
+    // the i+1th item in maxIOsOverride specifies how many I/Os the ith call to next() may take
+    // if there are more items in the iterator than maxIOsOverride, then we default to
+    // MAX_IO_PER_ITER_CREATE/MAX_IO_PER_NEXT once we run out of items in maxIOsOverride
+    private <T> List<T> indexIteratorToList(Supplier<Iterator<T>> iteratorSupplier,
+                                            Iterator<Integer> maxIOsOverride) {
+        bufferManager.flushAll();
+
+        long initialIOs = bufferManager.getNumIOs();
+
+        long prevIOs = initialIOs;
+        Iterator<T> iter = iteratorSupplier.get();
+        long newIOs = bufferManager.getNumIOs();
+        long maxIOs = maxIOsOverride.hasNext() ? maxIOsOverride.next() : MAX_IO_PER_ITER_CREATE;
+        assertFalse("too many I/Os used constructing iterator (" + (newIOs - prevIOs) + " > " + maxIOs +
+                    ") - are you materializing more than you need?",
+                    newIOs - prevIOs > maxIOs);
+
         List<T> xs = new ArrayList<>();
         while (iter.hasNext()) {
+            prevIOs = bufferManager.getNumIOs();
             xs.add(iter.next());
+            newIOs = bufferManager.getNumIOs();
+            maxIOs = maxIOsOverride.hasNext() ? maxIOsOverride.next() : MAX_IO_PER_NEXT;
+            assertFalse("too many I/Os used per next() call (" + (newIOs - prevIOs) + " > " + maxIOs +
+                        ") - are you materializing more than you need?",
+                        newIOs - prevIOs > maxIOs);
         }
+
+        long finalIOs = bufferManager.getNumIOs();
+        maxIOs = xs.size() / (2 * metadata.getOrder());
+        assertTrue("too few I/Os used overall (" + (finalIOs - initialIOs) + " < " + maxIOs +
+                   ") - are you materializing before the iterator is even constructed?",
+                   (finalIOs - initialIOs) >= maxIOs);
         return xs;
+    }
+
+    private <T> List<T> indexIteratorToList(Supplier<Iterator<T>> iteratorSupplier) {
+        return indexIteratorToList(iteratorSupplier, Collections.emptyIterator());
     }
 
     // Tests ///////////////////////////////////////////////////////////////////
@@ -384,18 +430,18 @@ public class TestBPlusTree {
                 }
 
                 // Test scanAll.
-                assertEquals(sortedRids, iteratorToList(tree.scanAll()));
+                assertEquals(sortedRids, indexIteratorToList(tree::scanAll));
 
                 // Test scanGreaterEqual.
                 for (int i = 0; i < keys.size(); i += 100) {
-                    Iterator<RecordId> actual = tree.scanGreaterEqual(new IntDataBox(i));
+                    final int j = i;
                     List<RecordId> expected = sortedRids.subList(i, sortedRids.size());
-                    assertEquals(expected, iteratorToList(actual));
+                    assertEquals(expected, indexIteratorToList(() -> tree.scanGreaterEqual(new IntDataBox(j))));
                 }
 
                 // Load the tree from disk.
                 BPlusTree fromDisk = new BPlusTree(bufferManager, metadata, treeContext);
-                assertEquals(sortedRids, iteratorToList(fromDisk.scanAll()));
+                assertEquals(sortedRids, indexIteratorToList(fromDisk::scanAll));
 
                 // Test remove.
                 Collections.shuffle(keys, new Random(42));

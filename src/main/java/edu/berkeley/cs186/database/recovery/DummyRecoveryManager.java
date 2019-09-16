@@ -1,8 +1,14 @@
 package edu.berkeley.cs186.database.recovery;
 
+import edu.berkeley.cs186.database.io.DiskSpaceManager;
+import edu.berkeley.cs186.database.memory.BufferManager;
+
 public class DummyRecoveryManager implements RecoveryManager {
     @Override
     public void initialize() {}
+
+    @Override
+    public void setManagers(DiskSpaceManager diskSpaceManager, BufferManager bufferManager) {}
 
     @Override
     public void commit(long transNum) {}
@@ -70,7 +76,9 @@ public class DummyRecoveryManager implements RecoveryManager {
     }
 
     @Override
-    public void restart() {}
+    public Runnable restart() {
+        return () -> {};
+    }
 
     @Override
     public void close() {}

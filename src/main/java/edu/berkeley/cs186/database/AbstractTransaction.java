@@ -1,6 +1,6 @@
 package edu.berkeley.cs186.database;
 
-abstract class AbstractTransaction implements Transaction {
+public abstract class AbstractTransaction implements Transaction {
     private Status status = Status.RUNNING;
 
     /**

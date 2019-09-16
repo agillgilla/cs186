@@ -4,10 +4,13 @@ import edu.berkeley.cs186.database.categories.HW99Tests;
 import edu.berkeley.cs186.database.categories.SystemTests;
 import edu.berkeley.cs186.database.concurrency.DummyLockContext;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
+import edu.berkeley.cs186.database.io.MemoryDiskSpaceManager;
 import edu.berkeley.cs186.database.io.PageException;
 import edu.berkeley.cs186.database.memory.BufferManager;
+import edu.berkeley.cs186.database.memory.BufferManagerImpl;
+import edu.berkeley.cs186.database.memory.ClockEvictionPolicy;
 import edu.berkeley.cs186.database.memory.Page;
-import edu.berkeley.cs186.database.memory.UnbackedBufferManager;
+import edu.berkeley.cs186.database.recovery.DummyRecoveryManager;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -24,7 +27,10 @@ public class TestPageDirectory {
 
     @Before
     public void setup() {
-        bufferManager = new UnbackedBufferManager();
+        DiskSpaceManager diskSpaceManager = new MemoryDiskSpaceManager();
+        diskSpaceManager.allocPart(0);
+        this.bufferManager = new BufferManagerImpl(diskSpaceManager, new DummyRecoveryManager(), 1024,
+                new ClockEvictionPolicy());
         pageDirectory = null;
     }
 
@@ -82,7 +88,7 @@ public class TestPageDirectory {
         } catch (IllegalArgumentException e) { /* do nothing */ }
 
         try {
-            pageDirectory.getPageWithSpace((short) -1);
+            pageDirectory.getPageWithSpace((short) - 1);
             fail();
         } catch (IllegalArgumentException e) { /* do nothing */ }
     }
@@ -161,7 +167,7 @@ public class TestPageDirectory {
         try {
             pageDirectory.updateFreeSpace(p1, (short) 10);
             fail();
-        } catch (IllegalStateException e) { /* do nothing */ }
+        } catch (PageException e) { /* do nothing */ }
     }
 
     @Test
@@ -173,7 +179,7 @@ public class TestPageDirectory {
         p1.unpin();
 
         try {
-            pageDirectory.updateFreeSpace(p1, (short) -1);
+            pageDirectory.updateFreeSpace(p1, (short) - 1);
             fail();
         } catch (IllegalArgumentException e) { /* do nothing */ }
 

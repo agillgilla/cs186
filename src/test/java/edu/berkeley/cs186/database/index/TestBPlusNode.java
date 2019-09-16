@@ -10,9 +10,11 @@ import edu.berkeley.cs186.database.TimeoutScaling;
 import edu.berkeley.cs186.database.concurrency.DummyLockContext;
 import edu.berkeley.cs186.database.concurrency.LockContext;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
+import edu.berkeley.cs186.database.io.MemoryDiskSpaceManager;
 import edu.berkeley.cs186.database.memory.BufferManager;
-import edu.berkeley.cs186.database.memory.Page;
-import edu.berkeley.cs186.database.memory.UnbackedBufferManager;
+import edu.berkeley.cs186.database.memory.BufferManagerImpl;
+import edu.berkeley.cs186.database.memory.ClockEvictionPolicy;
+import edu.berkeley.cs186.database.recovery.DummyRecoveryManager;
 import org.junit.*;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.DisableOnDebug;
@@ -40,7 +42,10 @@ public class TestBPlusNode {
 
     @Before
     public void setup() {
-        this.bufferManager = new UnbackedBufferManager();
+        DiskSpaceManager diskSpaceManager = new MemoryDiskSpaceManager();
+        diskSpaceManager.allocPart(0);
+        this.bufferManager = new BufferManagerImpl(diskSpaceManager, new DummyRecoveryManager(), 1024,
+                new ClockEvictionPolicy());
         this.treeContext = new DummyLockContext();
         this.metadata = new BPlusTreeMetadata("test", "col", Type.intType(), ORDER,
                                               0, DiskSpaceManager.INVALID_PAGE_NUM, -1);

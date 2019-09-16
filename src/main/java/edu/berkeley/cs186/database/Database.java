@@ -138,11 +138,14 @@ public class Database implements AutoCloseable {
 
         // TODO(hw5): change to use ARIES recovery manager
         recoveryManager = new DummyRecoveryManager();
-        // recoveryManager = new ARIESRecoveryManager(this, getLogContext(), recoveryTransaction);
+        // recoveryManager = new ARIESRecoveryManager(lockManager.databaseContext(), getLogContext(),
+        //                                            this::beginTransaction, recoveryTransaction);
 
         diskSpaceManager = new DiskSpaceManagerImpl(fileDir, recoveryManager);
         bufferManager = new BufferManagerImpl(diskSpaceManager, recoveryManager, numMemoryPages,
                                               policy);
+
+        recoveryManager.setManagers(diskSpaceManager, bufferManager);
 
         if (!initialized) {
             // create log partition, information_schema.tables partition, and information_schema.indices partition
@@ -152,7 +155,8 @@ public class Database implements AutoCloseable {
 
             recoveryManager.initialize();
         } else {
-            recoveryManager.restart();
+            Runnable r = recoveryManager.restart();
+            executor.submit(r);
         }
 
         LockContext dbContext = lockManager.databaseContext();
@@ -457,7 +461,7 @@ public class Database implements AutoCloseable {
                                  Type.longType(), Type.intType(), Type.intType(), Type.intType())
                );
     }
-    ;
+
     // a single row of information_schema.tables
     private static class TableInfoRecord {
         String tableName;
@@ -540,16 +544,17 @@ public class Database implements AutoCloseable {
         return lockManager.databaseContext().childContext(prefixUserTableName(table), partNum);
     }
 
-    // get the
+    // get the lock context for a table
     private LockContext getTableContext(String table) {
         return getTableContext(table, tableLookup.get(prefixUserTableName(table)).getPartNum());
     }
 
-    // get the lock context for an indexindex
+    // get the lock context for an index
     LockContext getIndexContext(String index, int partNum) {
         return lockManager.databaseContext().childContext("indices." + index, partNum);
     }
 
+    // get the lock context for an index
     LockContext getIndexContext(String index) {
         return getIndexContext(index, indexLookup.get(index).getPartNum());
     }
@@ -596,7 +601,18 @@ public class Database implements AutoCloseable {
      * @return the new Transaction
      */
     public synchronized Transaction beginTransaction() {
-        TransactionImpl t = new TransactionImpl(this.numTransactions++);
+        return beginTransaction(this.numTransactions);
+    }
+
+    /**
+     * Start a new transaction.
+     *
+     * @return the new Transaction
+     */
+    private synchronized Transaction beginTransaction(Long transactionNum) {
+        this.numTransactions = Math.max(this.numTransactions, transactionNum + 1);
+
+        TransactionImpl t = new TransactionImpl(transactionNum);
         activeTransactions.register();
         if (activeTransactions.isTerminated()) {
             activeTransactions = new Phaser(1);

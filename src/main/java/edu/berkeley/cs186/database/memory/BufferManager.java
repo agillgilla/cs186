@@ -75,7 +75,7 @@ public interface BufferManager extends AutoCloseable {
     BufferFrame fetchNewPageFrame(int partNum, boolean logPage);
 
     /**
-     * Calls flush on every frame in sequence.
+     * Calls flush on every frame in sequence, and evicts the frames from memory.
      */
     void flushAll();
 
@@ -84,4 +84,12 @@ public interface BufferManager extends AutoCloseable {
      * @param process method to consume page numbers
      */
     void iterPageNums(Consumer<Long> process);
+
+    /**
+     * Get the number of I/Os since the buffer manager was started, excluding anything used in disk
+     * space management, and not counting allocation/free. This is not really useful except as a
+     * relative measure.
+     * @return number of I/Os
+     */
+    long getNumIOs();
 }

@@ -223,12 +223,17 @@ class LeafNode extends BPlusNode {
 
     /** Serializes this leaf to its page. */
     private void sync() {
-        Buffer b = page.getBuffer();
-        byte[] newBytes = toBytes();
-        byte[] bytes = new byte[newBytes.length];
-        b.get(bytes);
-        if (!Arrays.equals(bytes, newBytes)) {
-            page.getBuffer().put(toBytes());
+        page.pin();
+        try {
+            Buffer b = page.getBuffer();
+            byte[] newBytes = toBytes();
+            byte[] bytes = new byte[newBytes.length];
+            b.get(bytes);
+            if (!Arrays.equals(bytes, newBytes)) {
+                page.getBuffer().put(toBytes());
+            }
+        } finally {
+            page.unpin();
         }
     }
 

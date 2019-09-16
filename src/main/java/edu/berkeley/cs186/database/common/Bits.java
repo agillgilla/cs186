@@ -1,5 +1,7 @@
 package edu.berkeley.cs186.database.common;
 
+import java.util.Arrays;
+
 public class Bits {
     public enum Bit { ZERO, ONE }
 
@@ -67,5 +69,26 @@ public class Bits {
      */
     public static void setBit(byte[] bytes, int i, Bit bit) {
         bytes[i / 8] = setBit(bytes[i / 8], i % 8, bit);
+    }
+
+    /**
+     * Counts the number of set bits. For example:
+     *
+     *   - countBits(0b00001010) == 2
+     *   - countBits(0b11111101) == 7
+     */
+    public static int countBits(byte b) {
+        return Integer.bitCount(b);
+    }
+
+    /**
+     * Counts the number of set bits.
+     */
+    public static int countBits(byte[] bytes) {
+        int count = 0;
+        for (byte b : bytes) {
+            count += countBits(b);
+        }
+        return count;
     }
 }

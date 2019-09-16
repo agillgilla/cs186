@@ -319,4 +319,15 @@ public class TestBufferManager {
         assertTrue(frame6.isValid());
         assertTrue(frame7.isValid());
     }
+
+    @Test(expected = PageException.class)
+    public void testMissingPart() {
+        bufferManager.fetchPageFrame(DiskSpaceManager.getVirtualPageNum(0, 0), false);
+    }
+
+    @Test(expected = PageException.class)
+    public void testMissingPage() {
+        int partNum = diskSpaceManager.allocPart();
+        bufferManager.fetchPageFrame(DiskSpaceManager.getVirtualPageNum(partNum, 0), false);
+    }
 }

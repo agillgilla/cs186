@@ -126,7 +126,7 @@ public class Page {
     /**
      * Force the page to disk.
      */
-    void flush() {
+    public void flush() {
         this.frame.flush();
     }
 

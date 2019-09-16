@@ -3,10 +3,14 @@ package edu.berkeley.cs186.database.table;
 import edu.berkeley.cs186.database.common.iterator.BacktrackingIterator;
 import edu.berkeley.cs186.database.common.iterator.IndexBacktrackingIterator;
 import edu.berkeley.cs186.database.concurrency.DummyLockContext;
+import edu.berkeley.cs186.database.io.DiskSpaceManager;
+import edu.berkeley.cs186.database.io.MemoryDiskSpaceManager;
 import edu.berkeley.cs186.database.io.PageException;
 import edu.berkeley.cs186.database.memory.BufferManager;
+import edu.berkeley.cs186.database.memory.BufferManagerImpl;
+import edu.berkeley.cs186.database.memory.ClockEvictionPolicy;
 import edu.berkeley.cs186.database.memory.Page;
-import edu.berkeley.cs186.database.memory.UnbackedBufferManager;
+import edu.berkeley.cs186.database.recovery.DummyRecoveryManager;
 
 import java.util.*;
 
@@ -18,8 +22,15 @@ public class MemoryHeapFile implements HeapFile, AutoCloseable {
     private Map<Long, Page> pages = new HashMap<>();
     private Map<Long, Short> freeSpace = new HashMap<>();
     private short emptyPageMetadataSize = 0;
-    private BufferManager bufferManager = new UnbackedBufferManager();
+    private BufferManager bufferManager;
     private int numDataPages = 0;
+
+    public MemoryHeapFile() {
+        DiskSpaceManager diskSpaceManager = new MemoryDiskSpaceManager();
+        diskSpaceManager.allocPart(0);
+        this.bufferManager = new BufferManagerImpl(diskSpaceManager, new DummyRecoveryManager(), 1024,
+                new ClockEvictionPolicy());
+    }
 
     @Override
     public void close() {

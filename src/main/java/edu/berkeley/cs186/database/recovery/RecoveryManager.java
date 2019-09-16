@@ -1,5 +1,8 @@
 package edu.berkeley.cs186.database.recovery;
 
+import edu.berkeley.cs186.database.io.DiskSpaceManager;
+import edu.berkeley.cs186.database.memory.BufferManager;
+
 /**
  * Interface for a recovery manager.
  */
@@ -8,6 +11,16 @@ public interface RecoveryManager extends AutoCloseable {
      * Initializes the log; only called the first time the database is set up.
      */
     void initialize();
+
+    /**
+     * Sets the buffer/disk managers. This is not part of the constructor because of the cyclic dependency
+     * between the buffer manager and recovery manager (the buffer manager must interface with the
+     * recovery manager to block page evictions until the log has been flushed, but the recovery
+     * manager needs to interface with the buffer manager to write the log and redo changes).
+     * @param diskSpaceManager disk space manager
+     * @param bufferManager buffer manager
+     */
+    void setManagers(DiskSpaceManager diskSpaceManager, BufferManager bufferManager);
 
     /**
      * Write a commit record to the log, and flush it to disk before returning.
@@ -114,10 +127,11 @@ public interface RecoveryManager extends AutoCloseable {
     void checkpoint();
 
     /**
-     * This method is called whenever the database starts up, and performs recovery.
-     * - [something something always happens]
+     * This method is called whenever the database starts up, aside from the very first run
+     * (when there is no log at all), and performs recovery.
+     * @return task to run to finish restart recovery
      */
-    void restart();
+    Runnable restart();
 
     @Override
     void close();

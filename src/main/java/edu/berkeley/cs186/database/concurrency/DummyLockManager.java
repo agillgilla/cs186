@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.List;
 
 import edu.berkeley.cs186.database.TransactionContext;
+import edu.berkeley.cs186.database.common.Pair;
 
 /**
  * Dummy lock manager that does no locking or error checking.
@@ -15,12 +16,12 @@ public class DummyLockManager extends LockManager {
 
     @Override
     public LockContext context(String readable, long name) {
-        return new DummyLockContext(null);
+        return new DummyLockContext(new Pair<>(readable, name));
     }
 
     @Override
     public LockContext databaseContext() {
-        return new DummyLockContext(null);
+        return new DummyLockContext(new Pair<>("database", 0L));
     }
 
     @Override

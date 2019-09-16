@@ -13,6 +13,7 @@ def check_student_id(student_id):
     if not m or len(student_id) not in (8, 10):
         print('Error: Please double check that your student id is entered correctly. It should only include digits 0-9 and be of length 8 or 10.')
         exit()
+    return student_id
 
 def test_category(assignment):
     return assignment[2:].replace('_p', 'P').replace('Part2', '')
