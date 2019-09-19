@@ -49,12 +49,10 @@ class LeafNode extends BPlusNode {
     //
     //   BPlusTreeMetadata meta = ...;
     //   int pageNum = ...;
-    //   Page page = allocator.fetchPage(pageNum);
-    //   ByteBuffer buf = page.getByteBuffer();
     //   LockContext treeContext = new DummyLockContext();
     //
-    //   LeafNode leaf0 = LeafNode.fromBytes(buf, meta, treeContext, pageNum);
-    //   LeafNode leaf1 = LeafNode.fromBytes(buf, meta, treeContext, pageNum);
+    //   LeafNode leaf0 = LeafNode.fromBytes(meta, bufferManager, treeContext, pageNum);
+    //   LeafNode leaf1 = LeafNode.fromBytes(meta, bufferManager, treeContext, pageNum);
     //
     // This scenario looks like this:
     //
