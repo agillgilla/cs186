@@ -5,6 +5,7 @@ import java.util.*;
 
 import edu.berkeley.cs186.database.common.Buffer;
 import edu.berkeley.cs186.database.common.Pair;
+import edu.berkeley.cs186.database.concurrency.Lock;
 import edu.berkeley.cs186.database.concurrency.LockContext;
 import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.databox.Type;
@@ -141,16 +142,16 @@ class LeafNode extends BPlusNode {
     @Override
     public LeafNode get(DataBox key) {
         // TODO(hw2): implement
-
-        return null;
+        // This is the base case.  Just return this leaf node.
+        return this;
     }
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf() {
         // TODO(hw2): implement
-
-        return null;
+        // This is the base case.  Just return this leaf node.
+        return this;
     }
 
     // See BPlusNode.put.
@@ -158,7 +159,46 @@ class LeafNode extends BPlusNode {
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(hw2): implement
 
-        return Optional.empty();
+        // Throw and exception if the key already exists
+        if (this.keys.contains(key)) {
+            throw new BPlusTreeException("The key"  + key + " already exists in the tree.");
+        }
+
+        // Get the oder of the tree
+        int order = this.metadata.getOrder();
+        // Get the index to insert the new key at
+        int insertIndex = InnerNode.numLessThanEqual(key, keys);
+
+        // Add the key and rid to the leaf node
+        keys.add(insertIndex, key);
+        rids.add(insertIndex, rid);
+
+        // Check if we ned to split the leaf node
+        if (keys.size() > 2 * order) {
+            // Split the lists of keys and rids
+            List<DataBox> leftKeys = this.keys.subList(0, order);
+            List<RecordId> leftRids = this.rids.subList(0, order);
+            List<DataBox> rightKeys = this.keys.subList(order, 2 * order + 1);
+            List<RecordId> rightRids = this.rids.subList(order, 2 * order + 1);
+
+            // Update this leaf node's keys and rids
+            this.keys = leftKeys;
+            this.rids = leftRids;
+
+            // Create the new leaf node
+            LeafNode newLeaf = new LeafNode(this.metadata, bufferManager, rightKeys, rightRids, this.rightSibling, treeContext);
+
+            // Update the right sibling page number
+            this.rightSibling = Optional.of(newLeaf.getPage().getPageNum());
+
+            // Make sure we flush buffer
+            sync();
+            return Optional.of(new Pair(rightKeys.get(0), newLeaf.getPage().getPageNum()));
+        } else {
+            // Make sure we flush buffer
+            sync();
+            return Optional.empty();
+        }
     }
 
     // See BPlusNode.bulkLoad.
@@ -167,6 +207,46 @@ class LeafNode extends BPlusNode {
             float fillFactor) {
         // TODO(hw2): implement
 
+        // Get the tree order from metadata
+        int order = metadata.getOrder();
+
+        int loadSize = (int) Math.ceil(2 * order * fillFactor);
+        while (data.hasNext()) {
+            // Load the databox and record id pair
+            Pair<DataBox, RecordId> dataBoxRecordIdPair = data.next();
+            // Add the databox and record id to lists
+            keys.add(dataBoxRecordIdPair.getFirst());
+            rids.add(dataBoxRecordIdPair.getSecond());
+
+            // Check if number of keys is larger than warranted by fill factor
+            if (!(keys.size() > loadSize)) {
+                sync();
+                return Optional.empty();
+            } else {
+                // We need to split leaf node
+
+                // Split the lists of keys and rids
+                List<DataBox> leftKeys = this.keys.subList(0, keys.size() - 1);
+                List<RecordId> leftRids = this.rids.subList(0, keys.size() - 1);
+                List<DataBox> rightKeys = this.keys.subList(keys.size() - 1, keys.size());
+                List<RecordId> rightRids = this.rids.subList(keys.size() - 1, keys.size());
+
+                // Update this leaf node's keys and rids
+                this.keys = leftKeys;
+                this.rids = leftRids;
+
+                // Create the new leaf node
+                LeafNode newLeaf = new LeafNode(this.metadata, bufferManager, rightKeys, rightRids, this.rightSibling, treeContext);
+
+                // Update the right sibling page number
+                this.rightSibling = Optional.of(newLeaf.getPage().getPageNum());
+
+                // Make sure we flush buffer
+                sync();
+                return Optional.of(new Pair(newLeaf.keys.get(0), newLeaf.getPage().getPageNum()));
+            }
+        }
+        // Reached end of iterator. No overflow
         return Optional.empty();
     }
 
@@ -175,6 +255,14 @@ class LeafNode extends BPlusNode {
     public void remove(DataBox key) {
         // TODO(hw2): implement
 
+        // If the key exists, remove it from keys and rids
+        if (this.keys.contains(key)) {
+            int index = this.keys.indexOf(key);
+            this.keys.remove(index);
+            this.rids.remove(index);
+        }
+        // Make sure we flush buffer
+        sync();
         return;
     }
 
@@ -364,7 +452,32 @@ class LeafNode extends BPlusNode {
                                      LockContext treeContext, long pageNum) {
         // TODO(hw2): implement
 
-        return null;
+        // Load the page with data
+        Page dataPage = bufferManager.fetchPage(treeContext, pageNum, false);
+        // Get a byte buffer to the page
+        Buffer buffer = dataPage.getBuffer();
+
+        // Initialize lists to read into
+        ArrayList<DataBox> keys = new ArrayList<>();
+        ArrayList<RecordId> rids = new ArrayList<>();
+
+        // Magic number
+        assert(buffer.get() == (byte) 1);
+
+        // Read the possible right sibling
+        long possibleRightSibling = buffer.getLong();
+        // Read the number of keys
+        int keysSize = buffer.getInt();
+        // Set the right sibling that will be used for instantiation
+        Optional rightSibling = possibleRightSibling == -1 ? Optional.empty() : Optional.of(possibleRightSibling);
+
+        for (int i = 0; i < keysSize; i++) {
+            // Loop and add elements to keys and rids lists
+            keys.add(DataBox.fromBytes(buffer, metadata.getKeySchema()));
+            rids.add(RecordId.fromBytes(buffer));
+        }
+        // Return a new LeafNode instance
+        return new LeafNode(metadata, bufferManager, dataPage, keys, rids, rightSibling, treeContext);
     }
 
     // Builtins //////////////////////////////////////////////////////////////////

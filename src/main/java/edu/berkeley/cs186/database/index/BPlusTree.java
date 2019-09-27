@@ -8,8 +8,6 @@ import java.util.*;
 import edu.berkeley.cs186.database.TransactionContext;
 import edu.berkeley.cs186.database.common.Pair;
 import edu.berkeley.cs186.database.concurrency.LockContext;
-import edu.berkeley.cs186.database.concurrency.LockType;
-import edu.berkeley.cs186.database.concurrency.LockUtil;
 import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.databox.Type;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
@@ -139,7 +137,8 @@ public class BPlusTree {
         // TODO(hw2): implement
         // TODO(hw4_part2): B+ tree locking
 
-        return Optional.empty();
+        // Search from the root inner node and get parent of leaf and get key from that
+        return this.root.get(key).getKey(key);
     }
 
     /**
@@ -192,7 +191,7 @@ public class BPlusTree {
         // TODO(hw2): Return a BPlusTreeIterator.
         // TODO(hw4_part2): B+ tree locking
 
-        return Collections.emptyIterator();
+        return new BPlusTreeIterator(this.root.getLeftmostLeaf());
     }
 
     /**
@@ -223,7 +222,7 @@ public class BPlusTree {
         // TODO(hw2): Return a BPlusTreeIterator.
         // TODO(hw4_part2): B+ tree locking
 
-        return Collections.emptyIterator();
+        return new BPlusTreeIterator(key, this.root.get(key));
     }
 
     /**
@@ -240,7 +239,25 @@ public class BPlusTree {
         // TODO(hw2): implement
         // TODO(hw4_part2): B+ tree locking
 
-        return;
+        Optional<Pair<DataBox, Long>> possibleNewNodeLeftAndPage = this.root.put(key, rid);
+
+        if (!possibleNewNodeLeftAndPage.isPresent()) {
+            return;
+        }
+
+        Pair<DataBox, Long> newNodeLeftAndPage =  possibleNewNodeLeftAndPage.get();
+
+        // Create new keys and children lists for new inner node
+        List<DataBox> newKeys = new ArrayList();
+        List<Long> newChildren = new ArrayList();
+
+        // Add new inner node to keys and children
+        newKeys.add(newNodeLeftAndPage.getFirst());
+        newChildren.add(this.root.getPage().getPageNum());
+        newChildren.add(newNodeLeftAndPage.getSecond());
+
+        // Update the root to be the new inner node
+        this.root = new InnerNode(this.metadata, bufferManager, newKeys, newChildren, lockContext);
     }
 
     /**
@@ -262,7 +279,32 @@ public class BPlusTree {
         // TODO(hw2): implement
         // TODO(hw4_part2): B+ tree locking
 
-        return;
+        if (this.root.getLeftmostLeaf().equals(this.root) && this.root.getLeftmostLeaf().getKeys().isEmpty()) {
+            // Loop through data until there is no more
+            while (data.hasNext()) {
+                // Call recursive bulk load on inner node
+                Optional<Pair<DataBox, Long>> possibleInnerNode = this.root.bulkLoad(data, fillFactor);
+                // Check if returned inner node was non-nil
+                if (possibleInnerNode.isPresent()) {
+                    // Instantiate lists for new iiner node
+                    List<Long> children = new ArrayList<>();
+                    List<DataBox> keys = new ArrayList<>();
+
+                    // Add key from returned inner node
+                    keys.add(possibleInnerNode.get().getFirst());
+                    children.add(this.root.getPage().getPageNum());
+
+                    // Add page index to children list
+                    long pageNum = possibleInnerNode.get().getSecond();
+                    children.add(pageNum);
+
+                    // Set root to new inner node instance
+                    this.root = new InnerNode(metadata, bufferManager, keys, children, lockContext);
+                }
+            }
+        } else {
+            throw new BPlusTreeException("Cannot bulk-load into a non-empty tree.");
+        }
     }
 
     /**
@@ -280,7 +322,8 @@ public class BPlusTree {
         typecheck(key);
         // TODO(hw2): implement
         // TODO(hw4_part2): B+ tree locking
-
+        // Just do the recursive call to inner node root
+        this.root.remove(key);
         return;
     }
 
@@ -384,10 +427,36 @@ public class BPlusTree {
     private class BPlusTreeIterator implements Iterator<RecordId> {
         // TODO(hw2): Add whatever fields and constructors you want here.
 
+        private LeafNode currLeaf;
+        private Iterator<RecordId> recordIterator;
+
+        public BPlusTreeIterator(LeafNode rootNode) {
+            currLeaf = rootNode;
+            recordIterator = currLeaf.scanAll();
+        }
+
+        // Iterator constructor to start from given key and node
+        public BPlusTreeIterator(DataBox startKey, LeafNode startNode) {
+            currLeaf = startNode.getLeftmostLeaf();
+            recordIterator = currLeaf.scanGreaterEqual(startKey);
+        }
+
         @Override
         public boolean hasNext() {
             // TODO(hw2): implement
 
+            // Short circuit true if record iterator has next
+            if (recordIterator.hasNext()) {
+                return true;
+            }
+
+            // Check if our current leaf has a valid right sibling pointer and that sibling has an object
+            else if (currLeaf.getRightSibling().isPresent() &&
+                    currLeaf.getRightSibling().get().scanAll().hasNext()) {
+                    return true;
+            }
+
+            // Return false if we haven't explicitly found a next object
             return false;
         }
 
@@ -395,7 +464,20 @@ public class BPlusTree {
         public RecordId next() {
             // TODO(hw2): implement
 
-            throw new NoSuchElementException();
+            if (this.hasNext()) {
+                // Check if our current record iterator has a next record
+                if (recordIterator.hasNext()) {
+                    // Return the next record from iterator
+                    return recordIterator.next();
+                } else {
+                    // Iterate the current leaf with next sibling in order
+                    currLeaf = currLeaf.getRightSibling().get();
+                    recordIterator = currLeaf.scanAll();
+                    return recordIterator.next();
+                }
+            } else {
+                throw new NoSuchElementException();
+            }
         }
     }
 }
