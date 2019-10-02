@@ -40,6 +40,11 @@ class GroupByOperator extends QueryOperator {
     }
 
     @Override
+    public boolean isGroupBy() {
+        return true;
+    }
+
+    @Override
     public Iterator<Record> iterator() {
         return new GroupByIterator();
     }

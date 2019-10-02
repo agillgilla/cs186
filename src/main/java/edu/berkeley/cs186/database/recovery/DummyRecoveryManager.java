@@ -1,5 +1,6 @@
 package edu.berkeley.cs186.database.recovery;
 
+import edu.berkeley.cs186.database.Transaction;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
 import edu.berkeley.cs186.database.memory.BufferManager;
 
@@ -11,15 +12,22 @@ public class DummyRecoveryManager implements RecoveryManager {
     public void setManagers(DiskSpaceManager diskSpaceManager, BufferManager bufferManager) {}
 
     @Override
-    public void commit(long transNum) {}
+    public void startTransaction(Transaction transaction) {}
 
     @Override
-    public void abort(long transNum) {
+    public long commit(long transNum) {
+        return 0;
+    }
+
+    @Override
+    public long abort(long transNum) {
         throw new UnsupportedOperationException("hw5 must be implemented to use abort");
     }
 
     @Override
-    public void end(long transNum) {}
+    public long end(long transNum) {
+        return 0;
+    }
 
     @Override
     public void pageFlushHook(long pageNum, long pageLSN) {}
@@ -31,12 +39,12 @@ public class DummyRecoveryManager implements RecoveryManager {
     }
 
     @Override
-    public long logAllocPart(long transNum, long partNum) {
+    public long logAllocPart(long transNum, int partNum) {
         return 0;
     }
 
     @Override
-    public long logFreePart(long transNum, long partNum) {
+    public long logFreePart(long transNum, int partNum) {
         return 0;
     }
 
@@ -51,9 +59,7 @@ public class DummyRecoveryManager implements RecoveryManager {
     }
 
     @Override
-    public long logDiskIO(long pageNum) {
-        return 0;
-    }
+    public void logDiskIO(long pageNum) {}
 
     @Override
     public void savepoint(long transNum, String name) {

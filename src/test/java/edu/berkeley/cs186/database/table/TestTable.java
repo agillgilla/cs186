@@ -54,7 +54,7 @@ public class TestTable {
     @Test
     public void testGetNumRecordsPerPage() {
         assertEquals(10, schema.getSizeInBytes());
-        assertEquals(4066, heapFile.getEffectivePageSize());
+        assertEquals(4060, heapFile.getEffectivePageSize());
         // 50 + (400 * 10) = 4050
         // 51 + (408 * 10) = 4131
         assertEquals(400, table.getNumRecordsPerPage());

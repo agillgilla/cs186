@@ -6,10 +6,10 @@ import edu.berkeley.cs186.database.io.DiskSpaceManager;
 import java.util.function.Consumer;
 
 public interface BufferManager extends AutoCloseable {
-    // We reserve 30 bytes on each page for bookkeeping for recovery
+    // We reserve 36 bytes on each page for bookkeeping for recovery
     // (used to store the pageLSN, and to ensure that a redo-only/undo-only log record can
     // fit on one page).
-    short RESERVED_SPACE = 30;
+    short RESERVED_SPACE = 36;
 
     // Effective page size available to users of buffer manager.
     short EFFECTIVE_PAGE_SIZE = DiskSpaceManager.PAGE_SIZE - RESERVED_SPACE;

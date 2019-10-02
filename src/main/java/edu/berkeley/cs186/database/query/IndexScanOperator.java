@@ -48,6 +48,11 @@ class IndexScanOperator extends QueryOperator {
     }
 
     @Override
+    public boolean isIndexScan() {
+        return true;
+    }
+
+    @Override
     public String str() {
         return "type: " + this.getType() +
                "\ntable: " + this.tableName +

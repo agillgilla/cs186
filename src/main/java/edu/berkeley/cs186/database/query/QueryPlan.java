@@ -406,7 +406,7 @@ public class QueryPlan {
          * Case 2. Set contains right table but not left, use pass1Map to
          * fetch the right operator to access the leftTable.
          *
-         * Case 3. Set contains neither or both the left table or right table (contiue loop)
+         * Case 3. Set contains neither or both the left table or right table (continue loop)
          *
          * --- Then given the operator, use minCostJoinType to calculate the cheapest join with that
          * and the previously joined tables.

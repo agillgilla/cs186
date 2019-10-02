@@ -57,6 +57,11 @@ abstract class JoinOperator extends QueryOperator {
     }
 
     @Override
+    public boolean isJoin() {
+        return true;
+    }
+
+    @Override
     public abstract Iterator<Record> iterator();
 
     @Override

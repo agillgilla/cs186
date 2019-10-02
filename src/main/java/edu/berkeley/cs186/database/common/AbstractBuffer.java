@@ -1,6 +1,7 @@
 package edu.berkeley.cs186.database.common;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 /**
  * Partial implementation of a Buffer, which funnels all operations
@@ -128,7 +129,7 @@ public abstract class AbstractBuffer implements Buffer {
     @Override
     public final Buffer put(int index, byte b) {
         bytes[0] = b;
-        return put(bytes, index, 1);
+        return put(Arrays.copyOfRange(bytes, 0, 1), index, 1);
     }
 
     @Override
@@ -140,7 +141,7 @@ public abstract class AbstractBuffer implements Buffer {
     @Override
     public final Buffer putChar(int index, char value) {
         buf.putChar(0, value);
-        return put(bytes, index, 1);
+        return put(Arrays.copyOfRange(bytes, 0, 1), index, 1);
     }
 
     @Override
@@ -152,7 +153,7 @@ public abstract class AbstractBuffer implements Buffer {
     @Override
     public final Buffer putDouble(int index, double value) {
         buf.putDouble(0, value);
-        return put(bytes, index, 8);
+        return put(Arrays.copyOfRange(bytes, 0, 8), index, 8);
     }
 
     @Override
@@ -164,7 +165,7 @@ public abstract class AbstractBuffer implements Buffer {
     @Override
     public final Buffer putFloat(int index, float value) {
         buf.putFloat(0, value);
-        return put(bytes, index, 4);
+        return put(Arrays.copyOfRange(bytes, 0, 4), index, 4);
     }
 
     @Override
@@ -176,7 +177,7 @@ public abstract class AbstractBuffer implements Buffer {
     @Override
     public final Buffer putInt(int index, int value) {
         buf.putInt(0, value);
-        return put(bytes, index, 4);
+        return put(Arrays.copyOfRange(bytes, 0, 4), index, 4);
     }
 
     @Override
@@ -188,7 +189,7 @@ public abstract class AbstractBuffer implements Buffer {
     @Override
     public final Buffer putLong(int index, long value) {
         buf.putLong(0, value);
-        return put(bytes, index, 8);
+        return put(Arrays.copyOfRange(bytes, 0, 8), index, 8);
     }
 
     @Override
@@ -200,7 +201,7 @@ public abstract class AbstractBuffer implements Buffer {
     @Override
     public final Buffer putShort(int index, short value) {
         buf.putShort(0, value);
-        return put(bytes, index, 2);
+        return put(Arrays.copyOfRange(bytes, 0, 2), index, 2);
     }
 
     @Override

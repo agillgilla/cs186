@@ -68,6 +68,11 @@ class ProjectOperator extends QueryOperator {
     }
 
     @Override
+    public boolean isProject() {
+        return true;
+    }
+
+    @Override
     protected Schema computeSchema() {
         // check to make sure that the source operator is giving us columns that we project
         Schema sourceSchema = this.getSource().getOutputSchema();

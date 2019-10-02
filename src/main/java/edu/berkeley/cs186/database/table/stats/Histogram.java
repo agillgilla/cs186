@@ -47,7 +47,7 @@ import edu.berkeley.cs186.database.databox.TypeId;
  * b.getEnd(); //returns 100.0
  * b.increment(15);// adds the value 15 to the bucket
  * b.getCount();//returns the number of items added to the bucket
- * b.getDistinctCount();//returns the approximate number of distinct iterms added to the bucket
+ * b.getDistinctCount();//returns the approximate number of distinct items added to the bucket
  *
  *
  */
@@ -256,7 +256,7 @@ public class Histogram {
     //Operations To Implement//////////////////////////////////////////////////////////////
 
     /**
-     *  Given a quantized value, scale the bucket that contains the value by 1/distinctCount,
+     *  Given a quantized value, set the bucket that contains the value by 1/distinctCount,
      *  and set all other values to 0.
      */
     private float [] allEquality(float qvalue) {
@@ -268,7 +268,7 @@ public class Histogram {
     }
 
     /**
-      *  Given a quantized value, scale the bucket that contains the value by 1-1/distinctCount,
+      *  Given a quantized value, set the bucket that contains the value by 1-1/distinctCount,
       *  and set all other values to 1.
       */
     private float [] allNotEquality(float qvalue) {
@@ -280,7 +280,7 @@ public class Histogram {
     }
 
     /**
-     *  Given a quantized value, scale the bucket that contains the value by (end - q)/width,
+     *  Given a quantized value, set the bucket that contains the value by (end - q)/width,
      *  and set all other buckets to 1 if higher and 0 if lower.
      */
     private float [] allGreaterThan(float qvalue) {
@@ -292,7 +292,7 @@ public class Histogram {
     }
 
     /**
-      *  Given a quantized value, scale the bucket that contains the value by (q-start)/width,
+      *  Given a quantized value, set the bucket that contains the value by (q-start)/width,
       *  and set all other buckets to 1 if lower and 0 if higher.
       */
     private float [] allLessThan(float qvalue) {

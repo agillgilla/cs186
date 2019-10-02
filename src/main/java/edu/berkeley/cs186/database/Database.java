@@ -33,7 +33,7 @@ public class Database implements AutoCloseable {
     private static final String TABLE_INFO_TABLE_NAME = METADATA_TABLE_PREFIX + "tables";
     private static final String INDEX_INFO_TABLE_NAME = METADATA_TABLE_PREFIX + "indices";
     private static final int DEFAULT_BUFFER_SIZE = 262144; // default of 1G
-    private static final int MAX_SCHEMA_SIZE = 4007;
+    private static final int MAX_SCHEMA_SIZE = 4001;
 
     // information_schema.tables, manages all tables in the database
     private Table tableInfo;
@@ -133,9 +133,6 @@ public class Database implements AutoCloseable {
         this.executor = new ThreadPool();
 
         recoveryTransaction = new TransactionContextImpl(-1);
-        initTransaction = beginTransaction();
-        TransactionContext.setTransaction(initTransaction.getTransactionContext());
-
         // TODO(hw5): change to use ARIES recovery manager
         recoveryManager = new DummyRecoveryManager();
         // recoveryManager = new ARIESRecoveryManager(lockManager.databaseContext(), getLogContext(),
@@ -148,8 +145,14 @@ public class Database implements AutoCloseable {
         recoveryManager.setManagers(diskSpaceManager, bufferManager);
 
         if (!initialized) {
-            // create log partition, information_schema.tables partition, and information_schema.indices partition
             diskSpaceManager.allocPart(0);
+        }
+
+        initTransaction = beginTransaction();
+        TransactionContext.setTransaction(initTransaction.getTransactionContext());
+
+        if (!initialized) {
+            // create log partition, information_schema.tables partition, and information_schema.indices partition
             diskSpaceManager.allocPart(1);
             diskSpaceManager.allocPart(2);
 
@@ -617,6 +620,8 @@ public class Database implements AutoCloseable {
         if (activeTransactions.isTerminated()) {
             activeTransactions = new Phaser(1);
         }
+
+        this.recoveryManager.startTransaction(t);
         return t;
     }
 

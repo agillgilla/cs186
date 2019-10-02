@@ -41,6 +41,11 @@ class SelectOperator extends QueryOperator {
     }
 
     @Override
+    public boolean isSelect() {
+        return true;
+    }
+
+    @Override
     public Schema computeSchema() {
         return this.getSource().getOutputSchema();
     }

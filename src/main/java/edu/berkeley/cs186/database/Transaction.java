@@ -19,7 +19,21 @@ public interface Transaction extends AutoCloseable {
         RUNNING,
         COMMITTING,
         ABORTING,
-        COMPLETE
+        COMPLETE;
+
+        private static Status[] values = Status.values();
+
+        public int getValue() {
+            return ordinal();
+        }
+
+        public static Status fromInt(int x) {
+            if (x < 0 || x >= values.length) {
+                String err = String.format("Unknown TypeId ordinal %d.", x);
+                throw new IllegalArgumentException(err);
+            }
+            return values[x];
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package edu.berkeley.cs186.database.recovery;
 
+import edu.berkeley.cs186.database.Transaction;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
 import edu.berkeley.cs186.database.memory.BufferManager;
 
@@ -23,23 +24,29 @@ public interface RecoveryManager extends AutoCloseable {
     void setManagers(DiskSpaceManager diskSpaceManager, BufferManager bufferManager);
 
     /**
+     * Adds transaction to transaction table.
+     * @param transaction new transaction to add to transaction table
+     */
+    void startTransaction(Transaction transaction);
+
+    /**
      * Write a commit record to the log, and flush it to disk before returning.
      * @param transNum transaction being committed
      */
-    void commit(long transNum);
+    long commit(long transNum);
 
     /**
      * Writes an abort record to the log.
      * @param transNum transaction being aborted
      */
-    void abort(long transNum);
+    long abort(long transNum);
 
     /**
      * Cleans up and ends the transaction. This method should write any needed
      * CLRs to the log, as well as the END record.
      * @param transNum transaction to finish
      */
-    void end(long transNum);
+    long end(long transNum);
 
     /**
      * Called before a page is flushed from the buffer cache. The log must be flushed
@@ -50,35 +57,37 @@ public interface RecoveryManager extends AutoCloseable {
     void pageFlushHook(long pageNum, long pageLSN);
 
     /**
-     * Log a write to a page. Should do nothing and return -1 if the page is a log page.
-    * @param transNum transaction performing the write
-    * @param pageNum page number of page being written
-    * @param pageOffset offset into page where write begins
-    * @param before bytes starting at pageOffset before the write
-    * @param after bytes starting at pageOffset after the write
-    * @return LSN of record
+     * Log a write to a page. Should do nothing and return -1 if the page is a log page. If the record
+     * would be too big (length * 2 > effective page size), then an undo-only update record is written,
+     * followed by a redo-only update record.
+     * @param transNum transaction performing the write
+     * @param pageNum page number of page being written
+     * @param pageOffset offset into page where write begins
+     * @param before bytes starting at pageOffset before the write
+     * @param after bytes starting at pageOffset after the write
+     * @return LSN of newest record
     */
     long logPageWrite(long transNum, long pageNum, short pageOffset, byte[] before,
                       byte[] after);
 
     /**
-     * Logs a partition allocation.
+     * Logs a partition allocation, and flushes the log.
      * @param transNum transaction requesting the allocation
      * @param partNum partition number of the new partition
      * @return LSN of record
      */
-    long logAllocPart(long transNum, long partNum);
+    long logAllocPart(long transNum, int partNum);
 
     /**
-     * Logs a partition free.
+     * Logs a partition free, and flushes the log.
      * @param transNum transaction requesting the partition be freed
      * @param partNum partition number of the partition being freed
      * @return LSN of record
      */
-    long logFreePart(long transNum, long partNum);
+    long logFreePart(long transNum, int partNum);
 
     /**
-     * Logs a page allocation.
+     * Logs a page allocation, and flushes the log.
      * @param transNum transaction requesting the allocation
      * @param pageNum page number of the new page
      * @return LSN of record
@@ -86,7 +95,7 @@ public interface RecoveryManager extends AutoCloseable {
     long logAllocPage(long transNum, long pageNum);
 
     /**
-     * Logs a page free.
+     * Logs a page free, and flushes the log.
      * @param transNum transaction requesting the page be freed
      * @param pageNum page number of the page being freed
      * @return LSN of record
@@ -94,11 +103,10 @@ public interface RecoveryManager extends AutoCloseable {
     long logFreePage(long transNum, long pageNum);
 
     /**
-     * Logs a successful flush.
+     * Called on a successful flush.
      * @param pageNum page number of page that was flushed
-     * @return LSN of record
      */
-    long logDiskIO(long pageNum);
+    void logDiskIO(long pageNum);
 
     /**
      * Creates a savepoint for a transaction.
