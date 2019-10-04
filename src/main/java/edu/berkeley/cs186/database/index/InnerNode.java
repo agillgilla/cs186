@@ -12,6 +12,8 @@ import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.memory.Page;
 import edu.berkeley.cs186.database.table.RecordId;
 
+import javax.xml.crypto.Data;
+
 /**
  * A inner node of a B+ tree. Every inner node in a B+ tree of order d stores
  * between d and 2d keys. An inner node with n keys stores n + 1 "pointers" to
@@ -80,9 +82,13 @@ class InnerNode extends BPlusNode {
     public LeafNode get(DataBox key) {
         // TODO(hw2): implement
 
-        // Get the index of the leaf node child
-        int index = numLessThanEqual(key, this.keys);
-        // Return the child from index
+        int index;
+        for (index = 0; index < this.keys.size(); index++) {
+            if (this.keys.get(index).compareTo(key) > 0) {
+                break;
+            }
+        }
+
         return this.getChild(index).get(key);
     }
 
@@ -92,8 +98,8 @@ class InnerNode extends BPlusNode {
         assert(children.size() > 0);
         // TODO(hw2): implement
 
-        // Just get the leftmost leaf of the leftmost child of this inner node
-        return getChild(0).getLeftmostLeaf();
+        BPlusNode leftLeaf = getChild(0);
+        return leftLeaf.getLeftmostLeaf();
     }
 
     // See BPlusNode.put.
@@ -101,57 +107,58 @@ class InnerNode extends BPlusNode {
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(hw2): implement
 
-        // Get index to insert new key at
-        int insertIndex = numLessThanEqual(key, this.keys);
-        // Call LeafNode subroutine to put key in leaf node
-        Optional possibleSplit = this.getChild(insertIndex).put(key, rid);
-
-        // Check if the leaf node was split
-        if (possibleSplit.isPresent()) {
-            // Get the new leaf node data
-            Pair<DataBox, Long> newLeafData = (Pair) possibleSplit.get();
-
-            //  Get the new index to insert new leaf node at
-            int newIndex = numLessThanEqual(newLeafData.getFirst(), this.keys);
-
-            // Get the order of the tree
-            int order = this.metadata.getOrder();
-
-            // Add the leaf node key
-            keys.add(newIndex, newLeafData.getFirst());
-            // Add the leaf node child
-            children.add(newIndex + 1, newLeafData.getSecond());
-
-            // Add the leaf node to children list
-            if (keys.size() > 2 * order) {
-                // Split the list of keys and children
-                List<DataBox> leftKeys = this.keys.subList(0, order);
-                List<Long> leftChildren = this.children.subList(0, order + 1);
-                List<DataBox> rightKeys = this.keys.subList(order + 1, 2 * order + 1);
-                List<Long> rightChildren = this.children.subList(order + 1, 2 * order + 2);
-
-                // Get key at split before reassigment
-                DataBox keyAtSplit = this.keys.get(order);
-
-                // Update the inner node's keys and children
-                this.keys = leftKeys;
-                this.children = leftChildren;
-
-                // Create the new inner node
-                InnerNode innerNode = new InnerNode(this.metadata, bufferManager, rightKeys, rightChildren, treeContext);
-
-                // Make sure we flush buffer
-                sync();
-                return Optional.of(new Pair(keyAtSplit, innerNode.getPage().getPageNum()));
-            } else {
-                // Make sure we flush buffer
-                sync();
-                return Optional.empty();
+        int index;
+        for (index = 0; index < this.keys.size(); index++) {
+            if (this.keys.get(index).compareTo(key) > 0) {
+                break;
             }
-        } else {
-            // Make sure we flush buffer
+        }
+
+        Optional splitNode = this.getChild(index).put(key, rid);
+
+        Pair<DataBox, Long> newLeafData = (Pair) splitNode.orElse(new Pair<DataBox, Long>(null, null));
+
+        if (newLeafData.getFirst() == null && newLeafData.getSecond() == null) {
             sync();
             return Optional.empty();
+        } else {
+            DataBox newKey = newLeafData.getFirst();
+            int splitIndex;
+            for (splitIndex = 0; splitIndex < this.keys.size(); splitIndex++) {
+                if (this.keys.get(splitIndex).compareTo(newKey) > 0) {
+                    break;
+                }
+            }
+
+            keys.add(splitIndex, newLeafData.getFirst());
+            children.add(splitIndex + 1, newLeafData.getSecond());
+
+            int order = this.metadata.getOrder();
+
+            if (keys.size() <= 2 * order) {
+                sync();
+                return Optional.empty();
+            } else {
+                DataBox splitKey = this.keys.get(order);
+
+                Pair<List, List> splitKeysLists = BPlusTree.splitList(this.keys, order, 2 * order + 1, true);
+
+                List<DataBox> leftSplitKeys = splitKeysLists.getFirst();
+                List<DataBox> rightSplitKeys = splitKeysLists.getSecond();
+
+                Pair<List, List> splitChildrenLists = BPlusTree.splitList(this.children, order + 1,  2 * order + 2, false);
+
+                List<Long> leftSplitChildren = splitChildrenLists.getFirst();
+                List<Long> rightSplitChildren = splitChildrenLists.getSecond();
+
+                this.keys = leftSplitKeys;
+                this.children = leftSplitChildren;
+
+                InnerNode innerNode = new InnerNode(this.metadata, bufferManager, rightSplitKeys, rightSplitChildren, treeContext);
+
+                sync();
+                return Optional.of(new Pair(splitKey, innerNode.getPage().getPageNum()));
+            }
         }
     }
 
@@ -161,41 +168,46 @@ class InnerNode extends BPlusNode {
             float fillFactor) {
         // TODO(hw2): implement
 
-        // Get the order from tree metadata
         int order = metadata.getOrder();
-        // Loop through data until there is no more or we fill the inner node
-        while (data.hasNext() && keys.size() < 2 * order + 1) {
-            // Bulk load into right-most child
-            Optional<Pair<DataBox, Long>> childPageAndData = getChild(children.size() - 1).bulkLoad(data, fillFactor);
-            if (childPageAndData.isPresent()) {
-                Pair<DataBox, Long> p = childPageAndData.get();
-                keys.add(keys.size(), p.getFirst());
-                children.add(children.size(), p.getSecond());
+
+        while (true) {
+            if (!data.hasNext() || keys.size() > 2 * order) {
+                break;
+            }
+
+            Optional rightChild = getChild(children.size() - 1).bulkLoad(data, fillFactor);
+            Pair<DataBox, Long> pageAndData = (Pair) rightChild.orElse(new Pair<DataBox, Long>(null, null));
+
+            if (!(pageAndData.getFirst() == null && pageAndData.getSecond() == null)) {
+                keys.add(keys.size(), pageAndData.getFirst());
+                children.add(children.size(), pageAndData.getSecond());
             }
         }
 
-        // Check if we need to split the inner node
-        if (keys.size() >= 2 * order + 1) {
-            // Split the list of keys and children
-            List<DataBox> leftKeys = this.keys.subList(0, order);
-            List<Long> leftChildren = this.children.subList(0, order + 1);
-            List<DataBox> rightKeys = this.keys.subList(order + 1, 2 * order + 1);
-            List<Long> rightChildren = this.children.subList(order + 1, 2 * order + 2);
-
-            // Update the inner node's keys and children
-            this.keys = leftKeys;
-            this.children = leftChildren;
-
-            // Create the new inner node
-            InnerNode innerNode = new InnerNode(this.metadata, bufferManager, rightKeys, rightChildren, treeContext);
-
-            // Make sure we flush buffer
-            sync();
-            return Optional.of(new Pair(this.keys.get(order), innerNode.getPage().getPageNum()));
-        } else {
-            // Make sure we flush buffer
+        if (keys.size() < 2 * order) {
             sync();
             return Optional.empty();
+        } else {
+
+            Pair<List, List> splitKeysLists = BPlusTree.splitList(this.keys, order, 2 * order + 1, true);
+
+            List<DataBox> leftSplitKeys = splitKeysLists.getFirst();
+            List<DataBox> rightSplitKeys = splitKeysLists.getSecond();
+
+            Pair<List, List> splitChildrenLists = BPlusTree.splitList(this.children, order + 1,  2 * order + 2, false);
+
+            List<Long> leftSplitChildren = splitChildrenLists.getFirst();
+            List<Long> rightSplitChildren = splitChildrenLists.getSecond();
+
+            this.keys = leftSplitKeys;
+            this.children = leftSplitChildren;
+
+            DataBox pushKey = this.keys.get(order);
+
+            InnerNode newNode = new InnerNode(this.metadata, bufferManager, rightSplitKeys, rightSplitChildren, treeContext);
+
+            sync();
+            return Optional.of(new Pair(pushKey, newNode.getPage().getPageNum()));
         }
     }
 
@@ -204,11 +216,9 @@ class InnerNode extends BPlusNode {
     public void remove(DataBox key) {
         // TODO(hw2): implement
 
-        // Remove the key from the leaf node that we get using get()
         this.get(key).remove(key);
-
-        // Make sure we flush buffer
         sync();
+
         return;
     }
 

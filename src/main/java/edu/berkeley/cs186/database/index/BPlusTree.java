@@ -137,8 +137,8 @@ public class BPlusTree {
         // TODO(hw2): implement
         // TODO(hw4_part2): B+ tree locking
 
-        // Search from the root inner node and get parent of leaf and get key from that
-        return this.root.get(key).getKey(key);
+        LeafNode leafNode = this.root.get(key);
+        return leafNode.getKey(key);
     }
 
     /**
@@ -191,7 +191,8 @@ public class BPlusTree {
         // TODO(hw2): Return a BPlusTreeIterator.
         // TODO(hw4_part2): B+ tree locking
 
-        return new BPlusTreeIterator(this.root.getLeftmostLeaf());
+        LeafNode leftLeaf = this.root.getLeftmostLeaf();
+        return new BPlusTreeIterator(leftLeaf);
     }
 
     /**
@@ -222,7 +223,8 @@ public class BPlusTree {
         // TODO(hw2): Return a BPlusTreeIterator.
         // TODO(hw4_part2): B+ tree locking
 
-        return new BPlusTreeIterator(key, this.root.get(key));
+        LeafNode minKey = this.root.get(key);
+        return new BPlusTreeIterator(minKey, key);
     }
 
     /**
@@ -239,25 +241,19 @@ public class BPlusTree {
         // TODO(hw2): implement
         // TODO(hw4_part2): B+ tree locking
 
-        Optional<Pair<DataBox, Long>> possibleNewNodeLeftAndPage = this.root.put(key, rid);
+        Optional splitNode = this.root.put(key, rid);
 
-        if (!possibleNewNodeLeftAndPage.isPresent()) {
-            return;
+        Pair<DataBox, Long> newLeafData =  (Pair) splitNode.orElse(new Pair<DataBox, Long>(null, null));
+
+        if (!(newLeafData.getFirst() == null && newLeafData.getSecond() == null)) {
+
+            List<DataBox> newKeys = new ArrayList();
+            newKeys.add(newLeafData.getFirst());
+
+            List<Long> newChildren = Arrays.asList(this.root.getPage().getPageNum(), newLeafData.getSecond());
+
+            this.root = new InnerNode(this.metadata, bufferManager, newKeys, newChildren, lockContext);
         }
-
-        Pair<DataBox, Long> newNodeLeftAndPage =  possibleNewNodeLeftAndPage.get();
-
-        // Create new keys and children lists for new inner node
-        List<DataBox> newKeys = new ArrayList();
-        List<Long> newChildren = new ArrayList();
-
-        // Add new inner node to keys and children
-        newKeys.add(newNodeLeftAndPage.getFirst());
-        newChildren.add(this.root.getPage().getPageNum());
-        newChildren.add(newNodeLeftAndPage.getSecond());
-
-        // Update the root to be the new inner node
-        this.root = new InnerNode(this.metadata, bufferManager, newKeys, newChildren, lockContext);
     }
 
     /**
@@ -280,30 +276,28 @@ public class BPlusTree {
         // TODO(hw4_part2): B+ tree locking
 
         if (this.root.getLeftmostLeaf().equals(this.root) && this.root.getLeftmostLeaf().getKeys().isEmpty()) {
-            // Loop through data until there is no more
-            while (data.hasNext()) {
-                // Call recursive bulk load on inner node
-                Optional<Pair<DataBox, Long>> possibleInnerNode = this.root.bulkLoad(data, fillFactor);
-                // Check if returned inner node was non-nil
-                if (possibleInnerNode.isPresent()) {
-                    // Instantiate lists for new iiner node
+            while (true) {
+                if (!data.hasNext()) {
+                    break;
+                }
+
+                Optional currNode = this.root.bulkLoad(data, fillFactor);
+                Pair<DataBox, Long> currNodePair = (Pair) currNode.orElse(new Pair<DataBox, Long>(null, null));
+
+                if (!(currNodePair.getFirst() == null && currNodePair.getSecond() == null)) {
                     List<Long> children = new ArrayList<>();
                     List<DataBox> keys = new ArrayList<>();
 
-                    // Add key from returned inner node
-                    keys.add(possibleInnerNode.get().getFirst());
+                    keys.add(currNodePair.getFirst());
+
                     children.add(this.root.getPage().getPageNum());
 
-                    // Add page index to children list
-                    long pageNum = possibleInnerNode.get().getSecond();
-                    children.add(pageNum);
+                    long pageInd = currNodePair.getSecond();
+                    children.add(pageInd);
 
-                    // Set root to new inner node instance
                     this.root = new InnerNode(metadata, bufferManager, keys, children, lockContext);
                 }
             }
-        } else {
-            throw new BPlusTreeException("Cannot bulk-load into a non-empty tree.");
         }
     }
 
@@ -322,9 +316,8 @@ public class BPlusTree {
         typecheck(key);
         // TODO(hw2): implement
         // TODO(hw4_part2): B+ tree locking
-        // Just do the recursive call to inner node root
+
         this.root.remove(key);
-        return;
     }
 
     // Helpers /////////////////////////////////////////////////////////////////
@@ -435,49 +428,43 @@ public class BPlusTree {
             recordIterator = currLeaf.scanAll();
         }
 
-        // Iterator constructor to start from given key and node
-        public BPlusTreeIterator(DataBox startKey, LeafNode startNode) {
+        public BPlusTreeIterator(LeafNode startNode, DataBox minKey) {
             currLeaf = startNode.getLeftmostLeaf();
-            recordIterator = currLeaf.scanGreaterEqual(startKey);
+            recordIterator = currLeaf.scanGreaterEqual(minKey);
         }
 
         @Override
         public boolean hasNext() {
             // TODO(hw2): implement
 
-            // Short circuit true if record iterator has next
-            if (recordIterator.hasNext()) {
+            if (recordIterator.hasNext() ||
+                    (currLeaf.getRightSibling().isPresent() && currLeaf.getRightSibling().get().scanAll().hasNext())) {
                 return true;
+            } else {
+                return false;
             }
-
-            // Check if our current leaf has a valid right sibling pointer and that sibling has an object
-            else if (currLeaf.getRightSibling().isPresent() &&
-                    currLeaf.getRightSibling().get().scanAll().hasNext()) {
-                    return true;
-            }
-
-            // Return false if we haven't explicitly found a next object
-            return false;
         }
 
         @Override
         public RecordId next() {
             // TODO(hw2): implement
 
-            if (this.hasNext()) {
-                // Check if our current record iterator has a next record
-                if (recordIterator.hasNext()) {
-                    // Return the next record from iterator
-                    return recordIterator.next();
-                } else {
-                    // Iterate the current leaf with next sibling in order
+            if (!this.hasNext()) {
+                throw new NoSuchElementException();
+            } else {
+                if (!recordIterator.hasNext()) {
                     currLeaf = currLeaf.getRightSibling().get();
                     recordIterator = currLeaf.scanAll();
-                    return recordIterator.next();
                 }
-            } else {
-                throw new NoSuchElementException();
+                return recordIterator.next();
             }
         }
+    }
+
+    public static Pair<List, List> splitList(List list, int splitIndex, int endIndex, boolean removeSplit) {
+        List firstHalf = list.subList(0, splitIndex);
+        List secondHalf = removeSplit ? list.subList(splitIndex + 1, endIndex) : list.subList(splitIndex, endIndex);
+
+        return new Pair<>(firstHalf, secondHalf);
     }
 }
