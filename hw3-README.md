@@ -51,7 +51,7 @@ To build and test your code in the container, run the following:
 mvn clean test -D HW=3
 ```
 
-There should be 18 failures, 16 errors, and 39 tests run.
+There should be 21 failures, 14 errors, and 39 tests run.
 
 To run just Part 1 tests, run:
 
@@ -59,7 +59,7 @@ To run just Part 1 tests, run:
 mvn clean test -D HW=3Part1
 ```
 
-There should be 9 failures, 2 errors, and 12 tests run.
+There should be 12 failures, 0 errors, and 12 tests run.
 
 To run just Part 2 tests, run:
 
