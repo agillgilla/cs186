@@ -16,7 +16,6 @@ import edu.berkeley.cs186.database.io.MemoryDiskSpaceManager;
 import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.memory.BufferManagerImpl;
 import edu.berkeley.cs186.database.memory.ClockEvictionPolicy;
-import edu.berkeley.cs186.database.memory.Page;
 import edu.berkeley.cs186.database.recovery.DummyRecoveryManager;
 import org.junit.*;
 import org.junit.experimental.categories.Category;
@@ -82,7 +81,7 @@ public class TestBPlusTree {
     // MAX_IO_PER_ITER_CREATE/MAX_IO_PER_NEXT once we run out of items in maxIOsOverride
     private <T> List<T> indexIteratorToList(Supplier<Iterator<T>> iteratorSupplier,
                                             Iterator<Integer> maxIOsOverride) {
-        bufferManager.flushAll();
+        bufferManager.evictAll();
 
         long initialIOs = bufferManager.getNumIOs();
 

@@ -75,9 +75,16 @@ public interface BufferManager extends AutoCloseable {
     BufferFrame fetchNewPageFrame(int partNum, boolean logPage);
 
     /**
-     * Calls flush on every frame in sequence, and evicts the frames from memory.
+     * Calls flush on the frame of a page and unloads the page from the frame. If the page
+     * is not loaded, this does nothing.
+     * @param pageNum page number of page to evict
      */
-    void flushAll();
+    void evict(long pageNum);
+
+    /**
+     * Calls evict on every frame in sequence.
+     */
+    void evictAll();
 
     /**
      * Calls the passed in method with the page number of every loaded page.

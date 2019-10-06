@@ -2,7 +2,6 @@ package edu.berkeley.cs186.database;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -133,6 +132,9 @@ public class Database implements AutoCloseable {
         this.executor = new ThreadPool();
 
         recoveryTransaction = new TransactionContextImpl(-1);
+        initTransaction = beginTransaction();
+        TransactionContext.setTransaction(initTransaction.getTransactionContext());
+
         // TODO(hw5): change to use ARIES recovery manager
         recoveryManager = new DummyRecoveryManager();
         // recoveryManager = new ARIESRecoveryManager(lockManager.databaseContext(), getLogContext(),
@@ -145,14 +147,8 @@ public class Database implements AutoCloseable {
         recoveryManager.setManagers(diskSpaceManager, bufferManager);
 
         if (!initialized) {
-            diskSpaceManager.allocPart(0);
-        }
-
-        initTransaction = beginTransaction();
-        TransactionContext.setTransaction(initTransaction.getTransactionContext());
-
-        if (!initialized) {
             // create log partition, information_schema.tables partition, and information_schema.indices partition
+            diskSpaceManager.allocPart(0);
             diskSpaceManager.allocPart(1);
             diskSpaceManager.allocPart(2);
 
@@ -396,7 +392,7 @@ public class Database implements AutoCloseable {
             }
         }
 
-        this.bufferManager.flushAll();
+        this.bufferManager.evictAll();
 
         this.recoveryManager.close();
         this.recoveryTransaction.close();
@@ -620,8 +616,6 @@ public class Database implements AutoCloseable {
         if (activeTransactions.isTerminated()) {
             activeTransactions = new Phaser(1);
         }
-
-        this.recoveryManager.startTransaction(t);
         return t;
     }
 

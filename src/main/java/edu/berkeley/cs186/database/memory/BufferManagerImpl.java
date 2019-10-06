@@ -171,7 +171,7 @@ public class BufferManagerImpl implements BufferManager {
                     return;
                 }
                 BufferManagerImpl.this.diskSpaceManager.writePage(pageNum, contents);
-                ++BufferManagerImpl.this.numIOs;
+                BufferManagerImpl.this.incrementIOs();
                 this.dirty = false;
             } finally {
                 super.unpin();
@@ -364,7 +364,7 @@ public class BufferManagerImpl implements BufferManager {
             newFrame.pageNum = pageNum;
             newFrame.pin();
             BufferManagerImpl.this.diskSpaceManager.readPage(pageNum, newFrame.contents);
-            ++numIOs;
+            this.incrementIOs();
             return newFrame;
         } catch (PageException e) {
             newFrame.unpin();
@@ -435,23 +435,40 @@ public class BufferManagerImpl implements BufferManager {
     }
 
     @Override
-    public void flushAll() {
-        for (int i = 0; i < frames.length; ++i) {
-            Frame frame = frames[i];
-            frame.frameLock.lock();
-            try {
-                if (frame.isValid()) {
-                    this.pageToFrame.remove(frame.pageNum, frame.index);
-                    evictionPolicy.cleanup(frame);
-
-                    frames[i] = new Frame(frame.contents, this.firstFreeIndex, false);
-                    this.firstFreeIndex = i;
-
-                    frame.invalidate();
-                }
-            } finally {
-                frame.frameLock.unlock();
+    public void evict(long pageNum) {
+        managerLock.lock();
+        try {
+            if (!pageToFrame.containsKey(pageNum)) {
+                return;
             }
+            evict(pageToFrame.get(pageNum));
+        } finally {
+            managerLock.unlock();
+        }
+    }
+
+    private void evict(int i) {
+        Frame frame = frames[i];
+        frame.frameLock.lock();
+        try {
+            if (frame.isValid() && !frame.isPinned()) {
+                this.pageToFrame.remove(frame.pageNum, frame.index);
+                evictionPolicy.cleanup(frame);
+
+                frames[i] = new Frame(frame.contents, this.firstFreeIndex, false);
+                this.firstFreeIndex = i;
+
+                frame.invalidate();
+            }
+        } finally {
+            frame.frameLock.unlock();
+        }
+    }
+
+    @Override
+    public void evictAll() {
+        for (int i = 0; i < frames.length; ++i) {
+            evict(i);
         }
     }
 
@@ -472,6 +489,10 @@ public class BufferManagerImpl implements BufferManager {
     @Override
     public long getNumIOs() {
         return numIOs;
+    }
+
+    private void incrementIOs() {
+        ++numIOs;
     }
 
     /**

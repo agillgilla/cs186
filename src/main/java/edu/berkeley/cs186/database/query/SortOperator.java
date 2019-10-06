@@ -2,6 +2,7 @@ package edu.berkeley.cs186.database.query;
 
 import edu.berkeley.cs186.database.TransactionContext;
 import edu.berkeley.cs186.database.DatabaseException;
+import edu.berkeley.cs186.database.common.iterator.BacktrackingIterator;
 import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.table.Record;
 import edu.berkeley.cs186.database.table.Schema;
@@ -35,31 +36,30 @@ public class SortOperator {
         }
     }
 
-    class Run {
-        String tempTableName;
+    /**
+     * Interface for a run. Also see createRun/createRunFromIterator.
+     */
+    public interface Run extends Iterable<Record> {
+        /**
+         * Add a record to the run.
+         * @param values set of values of the record to add to run
+         */
+        void addRecord(List<DataBox> values);
 
-        Run() {
-            this.tempTableName = SortOperator.this.transaction.createTempTable(
-                                     SortOperator.this.operatorSchema);
-        }
+        /**
+         * Add a list of records to the run.
+         * @param records records to add to the run
+         */
+        void addRecords(List<Record> records);
 
-        public void addRecord(List<DataBox> values) {
-            SortOperator.this.transaction.addRecord(this.tempTableName, values);
-        }
+        @Override
+        Iterator<Record> iterator();
 
-        void addRecords(List<Record> records) {
-            for (Record r : records) {
-                this.addRecord(r.getValues());
-            }
-        }
-
-        public Iterator<Record> iterator() {
-            return SortOperator.this.transaction.getRecordIterator(this.tempTableName);
-        }
-
-        public String tableName() {
-            return this.tempTableName;
-        }
+        /**
+         * Table name of table backing the run.
+         * @return table name
+         */
+        String tableName();
     }
 
     /**
@@ -119,14 +119,92 @@ public class SortOperator {
         return this.transaction.getRecordIterator(sortedTableName);
     }
 
+    /**
+     * Creates a new run for intermediate steps of sorting. The created
+     * run supports adding records.
+     * @return a new, empty run
+     */
+    Run createRun() {
+        return new IntermediateRun();
+    }
+
+    /**
+     * Creates a run given a backtracking iterator of records. Record adding
+     * is not supported, but creating this run will not incur any I/Os aside
+     * from any I/Os incurred while reading from the given iterator.
+     * @param records iterator of records
+     * @return run backed by the iterator of records
+     */
+    Run createRunFromIterator(BacktrackingIterator<Record> records) {
+        return new InputDataRun(records);
+    }
+
+    private class IntermediateRun implements Run {
+        String tempTableName;
+
+        IntermediateRun() {
+            this.tempTableName = SortOperator.this.transaction.createTempTable(
+                                     SortOperator.this.operatorSchema);
+        }
+
+        @Override
+        public void addRecord(List<DataBox> values) {
+            SortOperator.this.transaction.addRecord(this.tempTableName, values);
+        }
+
+        @Override
+        public void addRecords(List<Record> records) {
+            for (Record r : records) {
+                this.addRecord(r.getValues());
+            }
+        }
+
+        @Override
+        public Iterator<Record> iterator() {
+            return SortOperator.this.transaction.getRecordIterator(this.tempTableName);
+        }
+
+        @Override
+        public String tableName() {
+            return this.tempTableName;
+        }
+    }
+
+    private static class InputDataRun implements Run {
+        BacktrackingIterator<Record> iterator;
+
+        InputDataRun(BacktrackingIterator<Record> iterator) {
+            this.iterator = iterator;
+            this.iterator.markPrev();
+        }
+
+        @Override
+        public void addRecord(List<DataBox> values) {
+            throw new UnsupportedOperationException("cannot add record to input data run");
+        }
+
+        @Override
+        public void addRecords(List<Record> records) {
+            throw new UnsupportedOperationException("cannot add records to input data run");
+        }
+
+        @Override
+        public Iterator<Record> iterator() {
+            iterator.reset();
+            return iterator;
+        }
+
+        @Override
+        public String tableName() {
+            throw new UnsupportedOperationException("cannot get table name of input data run");
+        }
+    }
+
     private class RecordPairComparator implements Comparator<Pair<Record, Integer>> {
         @Override
         public int compare(Pair<Record, Integer> o1, Pair<Record, Integer> o2) {
             return SortOperator.this.comparator.compare(o1.getFirst(), o2.getFirst());
         }
-    }
-    Run createRun() {
-        return new Run();
     }
 }
 

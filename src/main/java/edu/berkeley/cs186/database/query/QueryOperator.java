@@ -8,7 +8,7 @@ import edu.berkeley.cs186.database.table.Record;
 import edu.berkeley.cs186.database.table.Schema;
 import edu.berkeley.cs186.database.table.stats.TableStats;
 
-public abstract class QueryOperator {
+public abstract class QueryOperator implements Iterable<Record> {
     private QueryOperator source;
     private QueryOperator destination;
     private Schema operatorSchema;
@@ -21,7 +21,8 @@ public abstract class QueryOperator {
         SELECT,
         GROUPBY,
         SEQSCAN,
-        INDEXSCAN
+        INDEXSCAN,
+        MATERIALIZE,
     }
 
     private OperatorType type;

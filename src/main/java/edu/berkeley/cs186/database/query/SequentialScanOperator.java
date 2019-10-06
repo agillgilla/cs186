@@ -23,7 +23,13 @@ class SequentialScanOperator extends QueryOperator {
      */
     SequentialScanOperator(TransactionContext transaction,
                            String tableName) {
-        super(OperatorType.SEQSCAN);
+        this(OperatorType.SEQSCAN, transaction, tableName);
+    }
+
+    protected SequentialScanOperator(OperatorType type,
+                                     TransactionContext transaction,
+                                     String tableName) {
+        super(type);
         this.transaction = transaction;
         this.tableName = tableName;
         this.setOutputSchema(this.computeSchema());
@@ -34,6 +40,11 @@ class SequentialScanOperator extends QueryOperator {
 
     public String getTableName() {
         return this.tableName;
+    }
+
+    @Override
+    public boolean isSequentialScan() {
+        return true;
     }
 
     @Override

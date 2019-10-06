@@ -2,6 +2,9 @@ package edu.berkeley.cs186.database.query;
 
 import edu.berkeley.cs186.database.*;
 import edu.berkeley.cs186.database.categories.*;
+import edu.berkeley.cs186.database.concurrency.DummyLockContext;
+import edu.berkeley.cs186.database.io.DiskSpaceManager;
+import edu.berkeley.cs186.database.memory.Page;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -29,6 +32,10 @@ import static org.junit.Assert.*;
 @Category({HW3Tests.class, HW3Part1Tests.class})
 public class TestJoinOperator {
     private Database d;
+    private long numIOs;
+    private QueryOperator leftSourceOperator;
+    private QueryOperator rightSourceOperator;
+    private Map<Long, Page> pinnedPages = new HashMap<>();
 
     @Rule
     public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -36,12 +43,15 @@ public class TestJoinOperator {
     @Before
     public void setup() throws IOException {
         File tempDir = tempFolder.newFolder("joinTest");
-        d = new Database(tempDir.getAbsolutePath(), 32);
+        d = new Database(tempDir.getAbsolutePath(), 256);
         d.setWorkMem(5); // B=5
     }
 
     @After
     public void cleanup() {
+        for (Page p : pinnedPages.values()) {
+            p.unpin();
+        }
         d.close();
     }
 
@@ -50,17 +60,97 @@ public class TestJoinOperator {
     public TestRule globalTimeout = new DisableOnDebug(Timeout.millis((long) (
                 4000 * TimeoutScaling.factor)));
 
+    private void startCountIOs() {
+        d.getBufferManager().evictAll();
+        numIOs = d.getBufferManager().getNumIOs();
+    }
+
+    private void checkIOs(String message, long minIOs, long maxIOs) {
+        if (message == null) {
+            message = "";
+        } else {
+            message = "(" + message + ")";
+        }
+
+        long newIOs = d.getBufferManager().getNumIOs();
+        long IOs = newIOs - numIOs;
+
+        assertTrue(IOs + " I/Os not between " + minIOs + " and " + maxIOs + message,
+                   minIOs <= IOs && IOs <= maxIOs);
+        numIOs = newIOs;
+    }
+
+    private void checkIOs(String message, long numIOs) {
+        checkIOs(message, numIOs, numIOs);
+    }
+
+    private void checkIOs(long minIOs, long maxIOs) {
+        checkIOs(null, minIOs, maxIOs);
+    }
+    private void checkIOs(long numIOs) {
+        checkIOs(null, numIOs, numIOs);
+    }
+
+    private void setSourceOperators(TestSourceOperator leftSourceOperator,
+                                    TestSourceOperator rightSourceOperator, Transaction transaction) {
+        setSourceOperators(
+            new MaterializeOperator(leftSourceOperator, transaction.getTransactionContext()),
+            new MaterializeOperator(rightSourceOperator, transaction.getTransactionContext())
+        );
+    }
+
+    private void pinPage(int partNum, int pageNum) {
+        long pnum = DiskSpaceManager.getVirtualPageNum(partNum, pageNum);
+        Page page = d.getBufferManager().fetchPage(new DummyLockContext(), pnum, false);
+        this.pinnedPages.put(pnum, page);
+    }
+
+    private void unpinPage(int partNum, int pageNum) {
+        long pnum = DiskSpaceManager.getVirtualPageNum(partNum, pageNum);
+        this.pinnedPages.remove(pnum).unpin();
+    }
+
+    private void evictPage(int partNum, int pageNum) {
+        long pnum = DiskSpaceManager.getVirtualPageNum(partNum, pageNum);
+        this.d.getBufferManager().evict(pnum);
+        numIOs = d.getBufferManager().getNumIOs();
+    }
+
+    private void setSourceOperators(QueryOperator leftSourceOperator,
+                                    QueryOperator rightSourceOperator) {
+        assert (this.leftSourceOperator == null && this.rightSourceOperator == null);
+
+        this.leftSourceOperator = leftSourceOperator;
+        this.rightSourceOperator = rightSourceOperator;
+
+        // hard-coded mess, but works as long as the first two tables created are the source operators
+        pinPage(1, 0); // information_schema.tables header page
+        pinPage(1, 3); // information_schema.tables entry for left source
+        pinPage(1, 4); // information_schema.tables entry for right source
+        pinPage(3, 0); // left source header page
+        pinPage(4, 0); // right source header page
+    }
+
     @Test
     @Category(PublicTests.class)
     public void testSimpleJoinPNLJ() {
-        TestSourceOperator sourceOperator = new TestSourceOperator();
         try(Transaction transaction = d.beginTransaction()) {
-            JoinOperator joinOperator = new PNLJOperator(sourceOperator, sourceOperator, "int", "int",
+            setSourceOperators(
+                new TestSourceOperator(),
+                new TestSourceOperator(),
+                transaction
+            );
+
+            startCountIOs();
+
+            JoinOperator joinOperator = new PNLJOperator(leftSourceOperator, rightSourceOperator, "int", "int",
                     transaction.getTransactionContext());
+            checkIOs(0);
 
             Iterator<Record> outputIterator = joinOperator.iterator();
-            int numRecords = 0;
+            checkIOs(2);
 
+            int numRecords = 0;
             List<DataBox> expectedRecordValues = new ArrayList<>();
             expectedRecordValues.add(new BoolDataBox(true));
             expectedRecordValues.add(new IntDataBox(1));
@@ -76,6 +166,7 @@ public class TestJoinOperator {
                 assertEquals("mismatch at record " + numRecords, expectedRecord, outputIterator.next());
                 numRecords++;
             }
+            checkIOs(0);
 
             assertFalse("too many records", outputIterator.hasNext());
             assertEquals("too few records", 100 * 100, numRecords);
@@ -85,15 +176,24 @@ public class TestJoinOperator {
     @Test
     @Category(PublicTests.class)
     public void testSimpleJoinBNLJ() {
-        TestSourceOperator sourceOperator = new TestSourceOperator();
         d.setWorkMem(5); // B=5
         try(Transaction transaction = d.beginTransaction()) {
-            JoinOperator joinOperator = new BNLJOperator(sourceOperator, sourceOperator, "int", "int",
+            setSourceOperators(
+                new TestSourceOperator(),
+                new TestSourceOperator(),
+                transaction
+            );
+
+            startCountIOs();
+
+            JoinOperator joinOperator = new BNLJOperator(leftSourceOperator, rightSourceOperator, "int", "int",
                     transaction.getTransactionContext());
+            checkIOs(0);
 
             Iterator<Record> outputIterator = joinOperator.iterator();
-            int numRecords = 0;
+            checkIOs(2);
 
+            int numRecords = 0;
             List<DataBox> expectedRecordValues = new ArrayList<>();
             expectedRecordValues.add(new BoolDataBox(true));
             expectedRecordValues.add(new IntDataBox(1));
@@ -109,6 +209,7 @@ public class TestJoinOperator {
                 assertEquals("mismatch at record " + numRecords, expectedRecord, outputIterator.next());
                 numRecords++;
             }
+            checkIOs(0);
 
             assertFalse("too many records", outputIterator.hasNext());
             assertEquals("too few records", 100 * 100, numRecords);
@@ -157,13 +258,20 @@ public class TestJoinOperator {
                 }
             }
 
-            QueryOperator s1 = new SequentialScanOperator(transaction.getTransactionContext(), "leftTable");
-            QueryOperator s2 = new SequentialScanOperator(transaction.getTransactionContext(), "rightTable");
-            QueryOperator joinOperator = new PNLJOperator(s1, s2, "int", "int",
+            setSourceOperators(
+                new SequentialScanOperator(transaction.getTransactionContext(), "leftTable"),
+                new SequentialScanOperator(transaction.getTransactionContext(), "rightTable")
+            );
+
+            startCountIOs();
+
+            QueryOperator joinOperator = new PNLJOperator(leftSourceOperator, rightSourceOperator, "int", "int",
                     transaction.getTransactionContext());
+            checkIOs(0);
 
             int count = 0;
             Iterator<Record> outputIterator = joinOperator.iterator();
+            checkIOs(2);
 
             while (outputIterator.hasNext() && count < 400 * 400 * 2) {
                 if (count < 200 * 200) {
@@ -184,6 +292,17 @@ public class TestJoinOperator {
                     assertEquals("mismatch at record " + count, expectedRecord1, outputIterator.next());
                 }
                 count++;
+
+                if (count == 200 * 200 * 2 || count == 200 * 200 * 6) {
+                    checkIOs("at record " + count, 1);
+                    evictPage(4, 1);
+                } else if (count == 200 * 200 * 4) {
+                    checkIOs("at record " + count, 2);
+                    evictPage(4, 2);
+                    evictPage(3, 1);
+                } else {
+                    checkIOs("at record " + count, 0);
+                }
             }
 
             assertFalse("too many records", outputIterator.hasNext());
@@ -194,15 +313,25 @@ public class TestJoinOperator {
     @Test
     @Category(PublicTests.class)
     public void testSimpleSortMergeJoin() {
-        TestSourceOperator sourceOperator = new TestSourceOperator();
         d.setWorkMem(5); // B=5
         try(Transaction transaction = d.beginTransaction()) {
-            JoinOperator joinOperator = new SortMergeOperator(sourceOperator, sourceOperator, "int", "int",
+            setSourceOperators(
+                new TestSourceOperator(),
+                new TestSourceOperator(),
+                transaction
+            );
+
+            startCountIOs();
+
+            JoinOperator joinOperator = new SortMergeOperator(leftSourceOperator, rightSourceOperator, "int",
+                    "int",
                     transaction.getTransactionContext());
+            checkIOs(0);
 
             Iterator<Record> outputIterator = joinOperator.iterator();
-            int numRecords = 0;
+            checkIOs(2 * (1 + (1 + TestSortOperator.NEW_TABLE_IOS)));
 
+            int numRecords = 0;
             List<DataBox> expectedRecordValues = new ArrayList<>();
             expectedRecordValues.add(new BoolDataBox(true));
             expectedRecordValues.add(new IntDataBox(1));
@@ -218,6 +347,7 @@ public class TestJoinOperator {
                 assertEquals("mismatch at record " + numRecords, expectedRecord, outputIterator.next());
                 numRecords++;
             }
+            checkIOs(0);
 
             assertFalse("too many records", outputIterator.hasNext());
             assertEquals("too few records", 100 * 100, numRecords);
@@ -277,13 +407,21 @@ public class TestJoinOperator {
                 transaction.getTransactionContext().addRecord("rightTable", rightTableRecords.get(i).getValues());
             }
 
-            QueryOperator s1 = new SequentialScanOperator(transaction.getTransactionContext(), "leftTable");
-            QueryOperator s2 = new SequentialScanOperator(transaction.getTransactionContext(), "rightTable");
+            setSourceOperators(
+                new SequentialScanOperator(transaction.getTransactionContext(), "leftTable"),
+                new SequentialScanOperator(transaction.getTransactionContext(), "rightTable")
+            );
 
-            JoinOperator joinOperator = new SortMergeOperator(s1, s2, "int", "int",
+            startCountIOs();
+
+            JoinOperator joinOperator = new SortMergeOperator(leftSourceOperator, rightSourceOperator, "int",
+                    "int",
                     transaction.getTransactionContext());
+            checkIOs(0);
 
             Iterator<Record> outputIterator = joinOperator.iterator();
+            checkIOs(2 * (2 + (2 + TestSortOperator.NEW_TABLE_IOS)));
+
             int numRecords = 0;
             Record expectedRecord;
 
@@ -301,6 +439,7 @@ public class TestJoinOperator {
                 assertEquals("mismatch at record " + numRecords, r, expectedRecord);
                 numRecords++;
             }
+            checkIOs(0);
 
             assertFalse("too many records", outputIterator.hasNext());
             assertEquals("too few records", 400 * 400, numRecords);
@@ -352,11 +491,21 @@ public class TestJoinOperator {
                     transaction.getTransactionContext().addRecord("rightTable", r2Vals);
                 }
             }
-            QueryOperator s1 = new SequentialScanOperator(transaction.getTransactionContext(), "leftTable");
-            QueryOperator s2 = new SequentialScanOperator(transaction.getTransactionContext(), "rightTable");
-            QueryOperator joinOperator = new BNLJOperator(s1, s2, "int", "int",
+
+            setSourceOperators(
+                new SequentialScanOperator(transaction.getTransactionContext(), "leftTable"),
+                new SequentialScanOperator(transaction.getTransactionContext(), "rightTable")
+            );
+
+            startCountIOs();
+
+            QueryOperator joinOperator = new BNLJOperator(leftSourceOperator, rightSourceOperator, "int", "int",
                     transaction.getTransactionContext());
+            checkIOs(0);
+
             Iterator<Record> outputIterator = joinOperator.iterator();
+            checkIOs(3);
+
             int count = 0;
             while (outputIterator.hasNext() && count < 4 * 200 * 200) {
                 Record r = outputIterator.next();
@@ -369,7 +518,14 @@ public class TestJoinOperator {
                 } else {
                     assertEquals("mismatch at record " + count, expectedRecord2, r);
                 }
+
                 count++;
+
+                if (count == 200 * 200 * 2) {
+                    checkIOs("at record " + count, 1);
+                } else {
+                    checkIOs("at record " + count, 0);
+                }
             }
             assertFalse("too many records", outputIterator.hasNext());
             assertEquals("too few records", 4 * 200 * 200, count);
