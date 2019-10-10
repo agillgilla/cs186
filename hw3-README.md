@@ -2,7 +2,7 @@
 
 This homework is divided into two parts.
 
-Part 1 is due: **Tuesday, 10/15/2019, 11:59 PM**.
+Part 1 is due: **Wednesday, 10/16/2019, 11:59 PM**.
 
 Part 2 is due: **Wednesday, 10/23/2019, 11:59 PM**.
 
