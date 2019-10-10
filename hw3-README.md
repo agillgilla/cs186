@@ -2,9 +2,9 @@
 
 This homework is divided into two parts.
 
-Part 1 is due: **Monday, 10/14/2019, 11:59 PM**.
+Part 1 is due: **Tuesday, 10/15/2019, 11:59 PM**.
 
-Part 2 is due: **Tuesday, 10/22/2019, 11:59 PM**.
+Part 2 is due: **Wednesday, 10/23/2019, 11:59 PM**.
 
 Part 2 does not require Part 1 to be completed first, but you will need to make sure
 any code you write for Part 1 does not throw an exception before starting Part 2. See
