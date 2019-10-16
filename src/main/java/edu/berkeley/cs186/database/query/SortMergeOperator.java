@@ -57,6 +57,133 @@ class SortMergeOperator extends JoinOperator {
         private SortMergeIterator() {
             super();
             // TODO(hw3_part1): implement
+
+            this.nextRecord = null;
+
+            SortOperator sortOperatorLeftRelation = new SortOperator(getTransaction(), getLeftTableName(), new LeftRecordComparator());
+            SortOperator sortOperatorRightRelation = new SortOperator(getTransaction(), getRightTableName(), new RightRecordComparator());
+
+            // Set each iterator to the sorted iterators from SortOperator
+            leftIterator = getRecordIterator(sortOperatorLeftRelation.sort());
+            rightIterator = getRecordIterator(sortOperatorRightRelation.sort());
+
+            this.leftRecord = leftIterator.hasNext() ? leftIterator.next() : null;
+            this.rightRecord = rightIterator.hasNext() ? rightIterator.next() : null;
+
+            try {
+                fetchNextRecord();
+            } catch (NoSuchElementException e) {
+                this.nextRecord = null;
+            }
+        }
+
+        /**
+         * Advances the left record
+         *
+         * The thrown exception means we're done: there is no next record
+         * It causes this.fetchNextRecord (the caller) to hand control to its caller.
+         */
+        private void advanceLeftRecord() {
+            if (!leftIterator.hasNext()) {
+                throw new NoSuchElementException("All Done!");
+            }
+            this.leftRecord = leftIterator.next();
+        }
+
+        private void advanceRightRecord() {
+            if (!rightIterator.hasNext()) {
+                throw new NoSuchElementException("All Done!");
+            }
+            this.rightRecord = rightIterator.next();
+        }
+
+        private int compareLeftRightRecords(Record leftRecord, Record rightRecord) {
+            return leftRecord.getValues().get(SortMergeOperator.this.getLeftColumnIndex()).compareTo(
+                    rightRecord.getValues().get(SortMergeOperator.this.getRightColumnIndex()));
+        }
+
+        /**
+         * Pre-fetches what will be the next record, and puts it in this.nextRecord.
+         * Pre-fetching simplifies the logic of this.hasNext() and this.next()
+         */
+        private void fetchNextRecord() {
+
+            // Begin pseudocode
+            /*
+            if (!marked) {
+                while (leftRecord < rightRecord) { advance leftRecord }
+                while (leftRecord > rightRecord) { advance rightRecord }
+
+                mark = rightRecord
+            }
+
+            if (leftRecord == rightRecord) {
+                //rightRecord.getValues().get(getRightColumnIndex()).compareTo()
+                result = <leftRecord, rightRecord>;
+
+                advance rightRecord;
+
+                return result
+            } else {
+               reset rightRecord to mark;
+
+               advance leftRecord;
+
+               mark = NULL;
+            }
+            */
+            // End pseudocode
+
+
+            if (this.leftRecord == null) { throw new NoSuchElementException("No new record to fetch"); }
+
+            this.nextRecord = null;
+
+            do {
+                if (!marked) {
+                    while (compareLeftRightRecords(leftRecord, rightRecord) < 0) {
+                        advanceLeftRecord();
+                    }
+
+                    while (compareLeftRightRecords(leftRecord, rightRecord) > 0) {
+                        advanceRightRecord();
+                    }
+
+                    this.marked = true;
+                    this.rightIterator.markPrev();
+                }
+
+                DataBox leftJoinValue = this.leftRecord.getValues().get(SortMergeOperator.this.getLeftColumnIndex());
+                DataBox rightJoinValue = this.rightRecord.getValues().get(SortMergeOperator.this.getRightColumnIndex());
+                if (leftJoinValue.equals(rightJoinValue)) {
+                    List<DataBox> leftValues = new ArrayList<>(this.leftRecord.getValues());
+                    List<DataBox> rightValues = new ArrayList<>(this.rightRecord.getValues());
+                    leftValues.addAll(rightValues);
+
+                    this.nextRecord = new Record(leftValues);
+
+                    try {
+                        advanceRightRecord();
+                    } catch (NoSuchElementException e) {
+                        rightIterator.reset();
+                        advanceRightRecord();
+
+                        try {
+                            advanceLeftRecord();
+                        } catch (NoSuchElementException ex) {
+                            leftRecord = null;
+                        }
+                    }
+                } else {
+                    this.rightIterator.reset();
+                    advanceRightRecord();
+
+                    advanceLeftRecord();
+
+                    this.marked = false;
+                }
+
+            } while (!hasNext());
         }
 
         /**
@@ -68,7 +195,7 @@ class SortMergeOperator extends JoinOperator {
         public boolean hasNext() {
             // TODO(hw3_part1): implement
 
-            return false;
+            return nextRecord != null;
         }
 
         /**
@@ -81,7 +208,18 @@ class SortMergeOperator extends JoinOperator {
         public Record next() {
             // TODO(hw3_part1): implement
 
-            throw new NoSuchElementException();
+            if (!this.hasNext()) {
+                throw new NoSuchElementException();
+            }
+
+            Record nextRecord = this.nextRecord;
+            try {
+                this.fetchNextRecord();
+            } catch (NoSuchElementException e) {
+                this.nextRecord = null;
+            }
+
+            return nextRecord;
         }
 
         @Override

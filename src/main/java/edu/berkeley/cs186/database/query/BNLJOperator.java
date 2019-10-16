@@ -89,6 +89,27 @@ class BNLJOperator extends JoinOperator {
          */
         private void fetchNextLeftBlock() {
             // TODO(hw3_part1): implement
+
+            while (true) {
+                this.leftIterator.markNext();
+                Iterator<Record> currIterator = getBlockIterator(this.getLeftTableName(), this.leftIterator, 1);
+
+                if (currIterator.hasNext()) {
+                    leftIterator.reset();
+                    leftRecordIterator = getBlockIterator(this.getLeftTableName(), this.leftIterator, numBuffers - 2);
+                    leftRecordIterator.markNext();
+                    leftRecord = leftRecordIterator.next();
+                    return;
+                }
+
+                if (this.leftIterator.hasNext()) {
+                    this.leftIterator.next();
+                } else {
+                    leftRecordIterator = null;
+                    leftRecord = null;
+                    return;
+                }
+            }
         }
 
         /**
@@ -99,8 +120,27 @@ class BNLJOperator extends JoinOperator {
          * If there are no more pages in the left relation with records, rightRecordIterator
          * should be set to null.
          */
-        private void fetchNextRightPage() {
+        private boolean fetchNextRightPage() {
             // TODO(hw3_part1): implement
+
+            boolean looped = false;
+
+            while (true) {
+                BacktrackingIterator<Record> currIterator = getBlockIterator(this.getRightTableName(), this.rightIterator, 1);
+
+                if (currIterator.hasNext()) {
+                    rightRecordIterator = currIterator;
+                    rightRecordIterator.markNext();
+                    return looped;
+                }
+
+                if (this.rightIterator.hasNext()) {
+                    this.rightIterator.next();
+                } else {
+                    looped = true;
+                    this.rightIterator.reset();
+                }
+            }
         }
 
         /**
@@ -111,6 +151,62 @@ class BNLJOperator extends JoinOperator {
          */
         private void fetchNextRecord() {
             // TODO(hw3_part1): implement
+
+            if (this.leftRecord == null) {
+                throw new NoSuchElementException("No new record to fetch");
+            }
+            this.nextRecord = null;
+
+            Record rightRecord = null;
+
+            do {
+                if (rightRecordIterator.hasNext()) {
+                    rightRecord = this.rightRecordIterator.next();
+                } else {
+                    // We just reached the end of a page in the right relation
+                    if (leftRecordIterator.hasNext()) {
+                        // We have more records in the left relation (iterate left and right)
+                        this.leftRecord = this.leftRecordIterator.next();
+
+                        // Reset the page in the right relation for looping
+                        this.rightRecordIterator.reset();
+                        this.rightRecordIterator.markNext();
+                        rightRecord = this.rightRecordIterator.next();
+                    } else {
+                        // We have just looped through all the records in B-2 block of left relation
+
+                        boolean looped = fetchNextRightPage();
+
+                        this.rightRecordIterator.markNext();
+                        rightRecord = this.rightRecordIterator.next();
+
+                        if (looped) {
+                            // We looped around in the right relation page loop;
+                            // we need to fetch a new B-2 block from the left relation
+                            // TODO: How can I move this to before fetching the next right page?
+                            // TODO: i.e. how do you check if you'll need to fetch a new block before getting next right page?
+                            fetchNextLeftBlock();
+                            if (leftRecord == null) {
+                                throw new NoSuchElementException("No more records in left relation");
+                            }
+                        } else {
+                            // We started a new page loop on right relation, but
+                            // still midway through all of right relation's records
+                            leftRecordIterator.reset();
+                            leftRecordIterator.markNext();
+                            leftRecord = leftRecordIterator.next();
+                        }
+                    }
+                }
+
+                DataBox leftJoinValue = this.leftRecord.getValues().get(BNLJOperator.this.getLeftColumnIndex());
+                DataBox rightJoinValue = rightRecord.getValues().get(BNLJOperator.this.getRightColumnIndex());
+
+                if (leftJoinValue.equals(rightJoinValue)) {
+                    this.nextRecord = joinRecords(leftRecord, rightRecord);
+                }
+
+            } while (nextRecord == null);
         }
 
         /**
