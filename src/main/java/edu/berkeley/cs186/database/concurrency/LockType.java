@@ -20,7 +20,26 @@ public enum LockType {
         }
         // TODO(hw4_part1): implement
 
-        return false;
+        if (b == NL) {
+            return true;
+        }
+
+        switch(a) {
+            case S:
+                return b == IS || b == S;
+            case X:
+                return false;
+            case IS:
+                return b != X;
+            case IX:
+                return b == IS || b == IX;
+            case SIX:
+                return b == IS;
+            case NL:
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**
@@ -52,7 +71,14 @@ public enum LockType {
         }
         // TODO(hw4_part1): implement
 
-        return false;
+        if (childLockType == IS || childLockType == S) {
+            return parentLockType == IS || parentLockType == IX;
+        } else if (childLockType == IX || childLockType == SIX || childLockType == X) {
+            return parentLockType == IX || parentLockType == SIX;
+        } else {
+            // Child is NL
+            return true;
+        }
     }
 
     /**
@@ -67,7 +93,27 @@ public enum LockType {
         }
         // TODO(hw4_part1): implement
 
-        return false;
+        if (required == substitute) {
+            // If substitute is same, then it is definitely substitutable
+            return true;
+        } else if (substitute == NL) {
+            // No lock can ever substitute for anything (except no lock)
+            return false;
+        }
+
+        if (required == S) {
+            return substitute == X || substitute == SIX;
+        } else  if (required == X) {
+            return false;
+        } else if (required == IS) {
+            return true;
+        } else if (required == IX) {
+            return substitute == X || substitute == SIX;
+        } else if (required == SIX) {
+            return substitute == X;
+        } else {
+            return false;
+        }
     }
 
     @Override
