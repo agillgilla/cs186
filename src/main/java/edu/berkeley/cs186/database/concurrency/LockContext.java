@@ -96,7 +96,33 @@ public class LockContext {
     throws InvalidLockException, DuplicateLockRequestException {
         // TODO(hw4_part1): implement
 
-        return;
+        if (this.readonly) {
+            throw new UnsupportedOperationException("Attempt to acquire on read-only LockContext: " + getResourceName());
+        }
+
+        List<Lock> locksHeld = lockman.getLocks(transaction);
+
+        for (Lock lock : locksHeld) {
+            if (lock.name.equals(this.getResourceName()) && lock.lockType == lockType) {
+                throw new DuplicateLockRequestException("Attempt to acquire duplicate lock on " + this.getResourceName() + " of type: " + lockType);
+            }
+        }
+
+        lockman.acquire(transaction, name, lockType);
+
+        if (parent != null) {
+            // Check if the LockContext has enough authority from its parent to acquire
+            if (LockType.substitutable(parent.getExplicitLockType(transaction), LockType.parentLock(lockType))) {
+                // Increment the number of child locks on parent
+                LockContext parentContext = this.parentContext();
+
+                parentContext.numChildLocks.put(
+                        transaction.getTransNum(),
+                        parentContext.numChildLocks.getOrDefault(transaction.getTransNum(), 0) + 1);
+            } else {
+                throw new InvalidLockException("Attempt to acquire lock without authorization.  Held: " + parent.getExplicitLockType(transaction) + ", Requested: " + LockType.parentLock(lockType));
+            }
+        }
     }
 
     /**
@@ -114,7 +140,28 @@ public class LockContext {
     throws NoLockHeldException, InvalidLockException {
         // TODO(hw4_part1): implement
 
-        return;
+        if (this.readonly) {
+            throw new UnsupportedOperationException("Attempt to release on read-only LockContext: " + this.getResourceName());
+        }
+
+        if (numChildLocks.containsKey(transaction.getTransNum()) && numChildLocks.get(transaction.getTransNum()) > 0) {
+            throw new InvalidLockException("Attempt to release a lock from LockContext: " + this.getResourceName() + " while child context is holding lock(s)");
+        }
+
+        try {
+            this.lockman.release(transaction, name);
+
+            LockContext parentContext = this.parentContext();
+
+            if (parentContext != null) {
+                parentContext.numChildLocks.put(
+                        transaction.getTransNum(),
+                        parentContext.numChildLocks.get(transaction.getTransNum()) - 1);
+            }
+
+        } catch (NoLockHeldException e) {
+            throw new NoLockHeldException("Attempt to release lock not held on resource: " + this.getResourceName());
+        }
     }
 
     /**
@@ -136,7 +183,23 @@ public class LockContext {
     throws DuplicateLockRequestException, NoLockHeldException, InvalidLockException {
         // TODO(hw4_part1): implement
 
-        return;
+        if (this.readonly) {
+            throw new UnsupportedOperationException("Attempt to promote on read-only LockContext: " + getResourceName());
+        }
+
+        if (this.parentContext() != null) {
+            if (!LockType.canBeParentLock(this.parentContext().getEffectiveLockType(transaction), newLockType)) {
+                throw new InvalidLockException("Attempt to obtain unauthorized child lock type based on parent's permissions for resource: " + this.getResourceName());
+            }
+        }
+
+        try {
+            lockman.promote(transaction, name, newLockType);
+        } catch (InvalidLockException ile) {
+            throw new NoLockHeldException("Attempt to do invalid promotion (demotion) on lock for resource: " + this.getResourceName());
+        } catch (NoLockHeldException nlhe) {
+            throw new NoLockHeldException("Attempt to promote not held lock for resource: " + this.getResourceName());
+        }
     }
 
     /**
@@ -163,7 +226,55 @@ public class LockContext {
     public void escalate(TransactionContext transaction) throws NoLockHeldException {
         // TODO(hw4_part1): implement
 
-        return;
+        if (this.readonly) {
+            throw new UnsupportedOperationException("Attempt to escalate on read-only LockContext: " + getResourceName());
+        }
+
+        if (getExplicitLockType(transaction) == LockType.NL && numChildLocks.getOrDefault(transaction.getTransNum(), 0) == 0) {
+            throw new NoLockHeldException("Attempt to escalate on LockContext with no children locks.");
+        }
+
+
+        List<Lock> heldLocks = lockman.getLocks(transaction);
+        List<Lock> nonDescendantsExceptSelf = new ArrayList<>();
+
+        // Filter out non-descendants (except self) from list of locks on resource
+        for (Lock heldLock : heldLocks) {
+            if (!heldLock.name.isDescendantOf(this.getResourceName()) && !heldLock.name.equals(this.getResourceName())) {
+                nonDescendantsExceptSelf.add(heldLock);
+            }
+        }
+        heldLocks.removeAll(nonDescendantsExceptSelf);
+
+        List<Lock> descendantLocksAndSelf = heldLocks;
+
+        List<ResourceName> descendantsAndSelfToRelease = new ArrayList<>();
+        LockType levelToEscalateTo = LockType.S;
+        LockType selfLevel = null;
+        // Find out the least permissive level to escalate to (either S or X)
+        for (Lock currLock : descendantLocksAndSelf) {
+            if (!LockType.canBeParentLock(LockType.IS, currLock.lockType)) {
+                levelToEscalateTo = LockType.X;
+            }
+
+            if (currLock.name.equals(this.getResourceName())) {
+                selfLevel = currLock.lockType;
+            }
+
+            descendantsAndSelfToRelease.add(currLock.name);
+        }
+
+        // Check if we even have to do anything
+        if (descendantsAndSelfToRelease.size() == 1 &&
+                descendantsAndSelfToRelease.get(0).equals(this.getResourceName()) &&
+                selfLevel.equals(levelToEscalateTo)) {
+            return;
+        }
+
+        numChildLocks.put(transaction.getTransNum(), 0);
+
+        lockman.acquireAndRelease(transaction, this.getResourceName(), levelToEscalateTo, descendantsAndSelfToRelease);
+
     }
 
     /**
@@ -172,11 +283,36 @@ public class LockContext {
      * Returns NL if there is no explicit nor implicit lock.
      */
     public LockType getEffectiveLockType(TransactionContext transaction) {
+
+        LockContext currContext = this;
+
         if (transaction == null) {
             return LockType.NL;
         }
+
         // TODO(hw4_part1): implement
-        return LockType.NL;
+
+        LockType effectiveLockType = null;
+        boolean parent = false;
+
+        while (true) {
+            if (currContext == null) {
+                break;
+            }
+            effectiveLockType = currContext.getExplicitLockType(transaction);
+            if (effectiveLockType == LockType.NL) {
+                currContext = currContext.parentContext();
+                parent = true;
+            } else {
+                if (parent) {
+                    if (effectiveLockType == LockType.IS || effectiveLockType == LockType.IX || effectiveLockType == LockType.SIX) {
+                        return LockType.NL;
+                    }
+                }
+                return effectiveLockType;
+            }
+        }
+        return effectiveLockType;
     }
 
     /**
@@ -187,7 +323,7 @@ public class LockContext {
             return LockType.NL;
         }
         // TODO(hw4_part1): implement
-        return LockType.NL;
+        return lockman.getLockType(transaction, this.getResourceName());
     }
 
     /**

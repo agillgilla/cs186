@@ -148,6 +148,7 @@ public class LockManager {
                     transactionLocks.put(transaction.getTransNum(), new ArrayList<Lock>(Arrays.asList(lockToAcquire)));
                 } else {
                     locksHeld.add(lockToAcquire);
+                    transactionLocks.put(transaction.getTransNum(), locksHeld);
                 }
                 this.getResourceEntry(name).locks.add(lockToAcquire);
             }
@@ -166,7 +167,7 @@ public class LockManager {
                 List<Lock> locksHeld = this.getLocks(transaction);
 
                 for (Lock lockHeld : locksHeld) {
-                    if (lockHeld.name.equals(lockToRelease)) {
+                    if (lockHeld.name.equals(lockToRelease) && !(lockHeld.name.equals(name) && lockHeld.lockType == lockType)) {
                         if (isCompatible) {
                             // Release the lock that the transaction has
                             transactionLocks.get(transaction.getTransNum()).remove(lockHeld);
@@ -290,6 +291,7 @@ public class LockManager {
                     transactionLocks.put(transaction.getTransNum(), new ArrayList<Lock>(Arrays.asList(lockToAcquire)));
                 } else {
                     locksHeld.add(lockToAcquire);
+                    transactionLocks.put(transaction.getTransNum(), locksHeld);
                 }
                 this.getResourceEntry(name).locks.add(lockToAcquire);
             }
@@ -411,7 +413,7 @@ public class LockManager {
 
                 if (transactionNum == transaction.getTransNum()) {
                     for (Lock lockHeld : locksHeld) {
-                        if (name.equals(lockHeld.name) & newLockType == lockHeld.lockType) {
+                        if (name.equals(lockHeld.name) && newLockType == lockHeld.lockType) {
                             throw new DuplicateLockRequestException("Attempt to promote duplicate lock for resource: " + name);
                         }
                     }
@@ -441,6 +443,8 @@ public class LockManager {
                 // Acquire the promoted lock
                 locksHeld.add(locksHeldIndex, lockToPromote);
                 this.getResourceEntry(name).locks.add(resourceIndex, lockToPromote);
+
+                transactionLocks.put(transaction.getTransNum(), locksHeld);
             }
 
         }
