@@ -40,6 +40,11 @@ public class LockContext {
     // Whether or not any new child LockContexts should be marked readonly.
     protected boolean childLocksDisabled;
 
+    // Whether or not auto-escalation of instance of table LockContexts is enabled.
+    // Should only be accessed with getter/setter
+    // Default is false, set to true if LockContext is table auto-escalation is explicitly enabled.
+    private boolean autoEscalateEnabled = false;
+
     public LockContext(LockManager lockman, LockContext parent, Pair<String, Long> name) {
         this(lockman, parent, name, false);
     }
@@ -108,21 +113,26 @@ public class LockContext {
             }
         }
 
-        lockman.acquire(transaction, name, lockType);
-
         if (parent != null) {
             // Check if the LockContext has enough authority from its parent to acquire
-            if (LockType.substitutable(parent.getExplicitLockType(transaction), LockType.parentLock(lockType))) {
+            if (LockType.substitutable(parent.getEffectiveLockType(transaction), LockType.parentLock(lockType))) {
                 // Increment the number of child locks on parent
                 LockContext parentContext = this.parentContext();
+
+                //System.out("Adding 1 to numChildLocks of resource: " + parentContext.getResourceName());
 
                 parentContext.numChildLocks.put(
                         transaction.getTransNum(),
                         parentContext.numChildLocks.getOrDefault(transaction.getTransNum(), 0) + 1);
+
+                //System.out("Number of child locks of " + parentContext.getResourceName() + " is now: " + parentContext.numChildLocks.get(transaction.getTransNum()) +
+                //        "\n (Transaction number: " + transaction.getTransNum() + ")");
             } else {
-                throw new InvalidLockException("Attempt to acquire lock without authorization.  Held: " + parent.getExplicitLockType(transaction) + ", Requested: " + LockType.parentLock(lockType));
+                throw new InvalidLockException("Attempt to acquire lock without authorization on resource: " + getResourceName() + ".  Held: " + parent.getEffectiveLockType(transaction) + ", Requested: " + LockType.parentLock(lockType));
             }
         }
+
+        lockman.acquire(transaction, name, lockType);
     }
 
     /**
@@ -154,9 +164,14 @@ public class LockContext {
             LockContext parentContext = this.parentContext();
 
             if (parentContext != null) {
+                //System.out("Subtracting 1 from numChildLocks of resource: " + parentContext.getResourceName());
+
                 parentContext.numChildLocks.put(
                         transaction.getTransNum(),
                         parentContext.numChildLocks.get(transaction.getTransNum()) - 1);
+
+                //System.out("Number of child locks of " + parentContext.getResourceName() + " is now: " + parentContext.numChildLocks.get(transaction.getTransNum()) +
+                //        "\n (Transaction number: " + transaction.getTransNum() + ")");
             }
 
         } catch (NoLockHeldException e) {
@@ -193,12 +208,39 @@ public class LockContext {
             }
         }
 
-        try {
-            lockman.promote(transaction, name, newLockType);
-        } catch (InvalidLockException ile) {
-            throw new NoLockHeldException("Attempt to do invalid promotion (demotion) on lock for resource: " + this.getResourceName());
-        } catch (NoLockHeldException nlhe) {
-            throw new NoLockHeldException("Attempt to promote not held lock for resource: " + this.getResourceName());
+        if (newLockType == LockType.SIX &&
+                (this.getExplicitLockType(transaction) == LockType.IS ||
+                 this.getExplicitLockType(transaction) == LockType.IX ||
+                 this.getExplicitLockType(transaction) == LockType.S )) {
+
+            List<Lock> heldLocks = lockman.getLocks(transaction);
+            List<Lock> descendantsAndSelfToRelease = new ArrayList<>();
+
+            // Filter out non-descendants (except self) from list of locks on resource
+            for (Lock heldLock : heldLocks) {
+                if ((heldLock.name.isDescendantOf(this.getResourceName()) && (heldLock.lockType == LockType.S || heldLock.lockType == LockType.IS || heldLock.lockType == LockType.SIX)) ||
+                     heldLock.name.equals(this.getResourceName())) {
+
+                    descendantsAndSelfToRelease.add(heldLock);
+                }
+            }
+
+            List<ResourceName> locksToRelease = new ArrayList<>();
+            for (Lock lock : descendantsAndSelfToRelease) {
+                locksToRelease.add(lock.name);
+            }
+
+            numChildLocks.put(transaction.getTransNum(), 0);
+
+            lockman.acquireAndRelease(transaction, this.getResourceName(), newLockType, locksToRelease);
+        } else {
+            try {
+                lockman.promote(transaction, name, newLockType);
+            } catch (InvalidLockException ile) {
+                throw new InvalidLockException("Attempt to do invalid promotion (demotion) on lock for resource: " + this.getResourceName());
+            } catch (NoLockHeldException nlhe) {
+                throw new NoLockHeldException("Attempt to promote not held lock for resource: " + this.getResourceName());
+            }
         }
     }
 
@@ -395,6 +437,16 @@ public class LockContext {
     @Override
     public String toString() {
         return "LockContext(" + name.toString() + ")";
+    }
+
+    public boolean isAutoEscalateEnabled() {
+        return this.autoEscalateEnabled;
+    }
+
+    public void setAutoEscalateEnabled(boolean enabled) {
+        //System.out.println("Enabling auto escalate for LockContext: " + this.getResourceName());
+        //System.out.flush();
+        this.autoEscalateEnabled = enabled;
     }
 }
 

@@ -106,11 +106,11 @@ public enum LockType {
         } else  if (required == X) {
             return false;
         } else if (required == IS) {
-            return true;
+            return substitute == IX || substitute == SIX;
         } else if (required == IX) {
-            return substitute == X || substitute == SIX;
+            return substitute == SIX;
         } else if (required == SIX) {
-            return substitute == X;
+            return false;
         } else {
             return false;
         }

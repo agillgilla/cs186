@@ -6,6 +6,7 @@ import edu.berkeley.cs186.database.DatabaseException;
 import edu.berkeley.cs186.database.common.iterator.*;
 import edu.berkeley.cs186.database.common.Bits;
 import edu.berkeley.cs186.database.common.Buffer;
+import edu.berkeley.cs186.database.concurrency.Lock;
 import edu.berkeley.cs186.database.concurrency.LockContext;
 import edu.berkeley.cs186.database.concurrency.LockType;
 import edu.berkeley.cs186.database.concurrency.LockUtil;
@@ -148,6 +149,10 @@ public class Table implements BacktrackingIterable<Record> {
         }
 
         this.lockContext = lockContext;
+        this.lockContext.setAutoEscalateEnabled(true);
+        //System.out.println("Constructing new table with LockContext" + lockContext.getResourceName());
+        //System.out.flush();
+        LockUtil.ensureSufficientLockHeld(this.lockContext, LockType.S);
     }
 
     // Accessors /////////////////////////////////////////////////////////////////
@@ -314,6 +319,9 @@ public class Table implements BacktrackingIterable<Record> {
     public synchronized Record updateRecord(List<DataBox> values, RecordId rid) {
         // TODO(hw4_part2): modify for smarter locking
 
+        LockContext recordLockContext = this.lockContext.childContext(rid.getPageNum());
+        LockUtil.ensureSufficientLockHeld(recordLockContext, LockType.X);
+
         validateRecordId(rid);
 
         Record newRecord = schema.verify(values);
@@ -338,6 +346,9 @@ public class Table implements BacktrackingIterable<Record> {
      */
     public synchronized Record deleteRecord(RecordId rid) {
         // TODO(hw4_part2): modify for smarter locking
+
+        LockContext recordLockContext = this.lockContext.childContext(rid.getPageNum());
+        LockUtil.ensureSufficientLockHeld(recordLockContext, LockType.X);
 
         validateRecordId(rid);
 
@@ -438,6 +449,7 @@ public class Table implements BacktrackingIterable<Record> {
      */
     public void enableAutoEscalate() {
         // TODO(hw4_part2): implement
+        this.lockContext.setAutoEscalateEnabled(true);
     }
 
     /**
@@ -446,11 +458,14 @@ public class Table implements BacktrackingIterable<Record> {
      */
     public void disableAutoEscalate() {
         // TODO(hw4_part2): implement
+        this.lockContext.setAutoEscalateEnabled(false);
     }
 
     // Iterators /////////////////////////////////////////////////////////////////
     public BacktrackingIterator<RecordId> ridIterator() {
         // TODO(hw4_part2): reduce locking overhead for table scans
+
+        LockUtil.ensureSufficientLockHeld(lockContext, LockType.S);
 
         BacktrackingIterator<Page> iter = heapFile.iterator();
         return new ConcatBacktrackingIterator<>(new PageIterator(iter, false));

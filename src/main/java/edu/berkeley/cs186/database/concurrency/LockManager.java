@@ -285,6 +285,7 @@ public class LockManager {
             }
 
             if (isCompatibleAndNoQueue) {
+                //System.out.println("ACQUISITION OF: " + name + " WENT THROUGH");
                 List<Lock> locksHeld = this.getLocks(transaction);
 
                 if (locksHeld.size() == 0) {
@@ -298,6 +299,7 @@ public class LockManager {
         }
 
         if (!isCompatibleAndNoQueue) {
+            //System.out.println("ACQUISITION OF: " + name + " BLOCKED!");
             transaction.block();
         }
     }
