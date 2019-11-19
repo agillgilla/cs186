@@ -55,10 +55,9 @@ public interface RecoveryManager extends AutoCloseable {
      * Called before a page is flushed from the buffer cache. This
      * method is never called on a log page.
      *
-     * @param pageNum page number of page about to be flushed
      * @param pageLSN pageLSN of page about to be flushed
      */
-    void pageFlushHook(long pageNum, long pageLSN);
+    void pageFlushHook(long pageLSN);
 
     /**
      * Called when a page has been updated on disk.

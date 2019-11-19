@@ -170,7 +170,7 @@ public class BufferManagerImpl implements BufferManager {
                     return;
                 }
                 if (!this.logPage) {
-                    recoveryManager.pageFlushHook(this.pageNum, this.getPageLSN());
+                    recoveryManager.pageFlushHook(this.getPageLSN());
                 }
                 BufferManagerImpl.this.diskSpaceManager.writePage(pageNum, contents);
                 BufferManagerImpl.this.incrementIOs();
@@ -356,6 +356,9 @@ public class BufferManagerImpl implements BufferManager {
                 try {
                     if (frame.isPinned()) {
                         throw new IllegalStateException("closing buffer manager but frame still pinned");
+                    }
+                    if (!frame.isValid()) {
+                        continue;
                     }
                     evictionPolicy.cleanup(frame);
                     frame.invalidate();

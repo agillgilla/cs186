@@ -41,6 +41,7 @@
                     <excludes>
                         <exclude>**/TestUtils.java</exclude>
                         <exclude>**/TestSourceOperator.java</exclude>
+                        <exclude>**/*$*</exclude>
                     </excludes>
                     <trimStackTrace>false</trimStackTrace>
                     <argLine> -Xms32m -Xmx32m </argLine> <!--ADD TEST JVM ARGS HERE i.e '-Xms8m -Xmx8m' to limit memory to 8m -->
@@ -59,7 +60,7 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
-                            <excludedGroups>edu.berkeley.cs186.database.categories.HiddenTests,edu.berkeley.cs186.database.categories.SystemTests</excludedGroups>
+                            <excludedGroups>edu.berkeley.cs186.database.categories.HiddenTests,edu.berkeley.cs186.database.categories.SystemTests,edu.berkeley.cs186.database.categories.StudentTests,edu.berkeley.cs186.database.categories.StudentTestRunner</excludedGroups>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -73,7 +74,35 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
-                            <excludedGroups>edu.berkeley.cs186.database.categories.PublicTests,edu.berkeley.cs186.database.categories.SystemTests</excludedGroups>
+                            <excludedGroups>edu.berkeley.cs186.database.categories.PublicTests,edu.berkeley.cs186.database.categories.SystemTests,edu.berkeley.cs186.database.categories.StudentTests,edu.berkeley.cs186.database.categories.StudentTestRunner</excludedGroups>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>student</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludedGroups>edu.berkeley.cs186.database.categories.PublicTests,edu.berkeley.cs186.database.categories.HiddenTests,edu.berkeley.cs186.database.categories.SystemTests,edu.berkeley.cs186.database.categories.StudentTestRunner</excludedGroups>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>student-runner</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludedGroups>edu.berkeley.cs186.database.categories.PublicTests,edu.berkeley.cs186.database.categories.HiddenTests,edu.berkeley.cs186.database.categories.SystemTests,edu.berkeley.cs186.database.categories.StudentTests</excludedGroups>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -87,7 +116,7 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
-                            <excludedGroups>edu.berkeley.cs186.database.categories.PublicTests,edu.berkeley.cs186.database.categories.HiddenTests</excludedGroups>
+                            <excludedGroups>edu.berkeley.cs186.database.categories.PublicTests,edu.berkeley.cs186.database.categories.HiddenTests,edu.berkeley.cs186.database.categories.StudentTests,edu.berkeley.cs186.database.categories.StudentTestRunner</excludedGroups>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -118,31 +147,19 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
-                            <excludedGroups>edu.berkeley.cs186.database.categories.SystemTests,edu.berkeley.cs186.database.categories.PublicTests,edu.berkeley.cs186.database.categories.HiddenTests</excludedGroups>
+                            <excludedGroups>edu.berkeley.cs186.database.categories.SystemTests,edu.berkeley.cs186.database.categories.PublicTests,edu.berkeley.cs186.database.categories.HiddenTests,edu.berkeley.cs186.database.categories.StudentTests,edu.berkeley.cs186.database.categories.StudentTestRunner</excludedGroups>
                         </configuration>
                     </plugin>
                 </plugins>
             </build>
         </profile>
-
-        <!-- TODO below -->
         <profile>
-            <id>test-staff</id>
-
+            <id>all</id>
             <build>
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
-                        <version>2.20.1</version>
-                        <configuration>
-                            <excludes>
-                                <exclude>**/TestUtils.java</exclude>
-                                <exclude>**/TestSourceOperator.java</exclude>
-                            </excludes>
-                            <trimStackTrace>false</trimStackTrace>
-                            <argLine> -Xms16m -Xmx16m -Xbootclasspath/p:reference-solution.jar </argLine> <!--ADD TEST JVM ARGS HERE i.e '-Xms8m -Xmx8m' to limit memory to 8m -->
-                        </configuration>
                     </plugin>
                 </plugins>
             </build>

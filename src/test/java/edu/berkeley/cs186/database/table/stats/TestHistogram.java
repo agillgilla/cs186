@@ -20,6 +20,10 @@ import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 import static org.junit.Assert.*;
 
 @Category({HW3Tests.class, HW3Part2Tests.class})
@@ -130,41 +134,41 @@ public class TestHistogram {
 
         //Should return [0.1,0,0,0,0,0,0,0,0,0,0]
         float [] result = h.filter(PredicateOperator.EQUALS, new IntDataBox(5));
-        assert(Math.abs(result[0] - 0.1) < 0.00001);
+        assertEquals(0.1, result[0], 0.00001);
         for (int i = 1; i < 10; i++) {
-            assert(Math.abs(result[i] - 0.0) < 0.00001);
+            assertEquals(0.0, result[i], 0.00001);
         }
 
         //Should return [0.9,1,1,1,1,1,1,1,1,1,1]
         result = h.filter(PredicateOperator.NOT_EQUALS, new IntDataBox(5));
-        assert(Math.abs(result[0] - 0.9) < 0.00001);
+        assertEquals(0.9, result[0], 0.00001);
         for (int i = 1; i < 10; i++) {
-            assert(Math.abs(result[i] - 1.0) < 0.00001);
+            assertEquals(1.0, result[i], 0.00001);
         }
 
         //Should return [0,0,0,0,0,0,0,0,0,0,0.1]
         result = h.filter(PredicateOperator.EQUALS, new IntDataBox(99));
-        assert(Math.abs(result[9] - 0.1) < 0.00001);
         for (int i = 0; i < 9; i++) {
-            assert(Math.abs(result[i] - 0.0) < 0.00001);
+            assertEquals(0.0, result[i], 0.00001);
         }
+        assertEquals(0.1, result[9], 0.00001);
 
         //Should return [0,0,0,0,0,0,0,0,0,0,0.0]
         result = h.filter(PredicateOperator.EQUALS, new IntDataBox(100));
         for (int i = 0; i < 10; i++) {
-            assert(Math.abs(result[i] - 0.0) < 0.00001);
+            assertEquals(0.0, result[i], 0.00001);
         }
 
         //Should return [0,0,0,0,0,0,0,0,0,0,0.0]
         result = h.filter(PredicateOperator.EQUALS, new IntDataBox(-1));
         for (int i = 0; i < 10; i++) {
-            assert(Math.abs(result[i] - 0.0) < 0.00001);
+            assertEquals(0.0, result[i], 0.00001);
         }
 
         //Should return [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
         result = h.filter(PredicateOperator.NOT_EQUALS, new IntDataBox(-1));
         for (int i = 0; i < 10; i++) {
-            assert(Math.abs(result[i] - 1.0) < 0.00001);
+            assertEquals(1.0, result[i], 0.00001);
         }
     }
 
@@ -183,30 +187,28 @@ public class TestHistogram {
 
         //Should return [0.1,1,1,1,1,1,1,1,1,1,1]
         float [] result = h.filter(PredicateOperator.GREATER_THAN, new IntDataBox(9));
-        assert(Math.abs(result[0] - 0.1) < 0.00001);
+        assertEquals(0.1, result[0], 0.00001);
         for (int i = 1; i < 10; i++) {
-            assert(Math.abs(result[i] - 1.0) < 0.00001);
+            assertEquals(1.0, result[i], 0.00001);
         }
 
         //Should return [0.0,1,1,1,1,1,1,1,1,1,1]
         result = h.filter(PredicateOperator.GREATER_THAN, new IntDataBox(10));
-        assert(Math.abs(result[0] - 0.0) < 0.00001);
+        assertEquals(0.0, result[0], 0.00001);
         for (int i = 1; i < 10; i++) {
-            assert(Math.abs(result[i] - 1.0) < 0.00001);
+            assertEquals(1.0, result[i], 0.00001);
         }
 
         //Should return [1,1,1,1,1,1,1,1,1,1,1]
         result = h.filter(PredicateOperator.GREATER_THAN, new IntDataBox(-1));
-        assert(Math.abs(result[0] - 1.0) < 0.00001);
-        for (int i = 1; i < 10; i++) {
-            assert(Math.abs(result[i] - 1.0) < 0.00001);
+        for (int i = 0; i < 10; i++) {
+            assertEquals(1.0, result[i], 0.00001);
         }
 
         //Should return [0,0,0,0,0,0,0,0,0,0,0.0]
         result = h.filter(PredicateOperator.GREATER_THAN, new IntDataBox(101));
-        assert(Math.abs(result[0] - 0.0) < 0.00001);
-        for (int i = 1; i < 10; i++) {
-            assert(Math.abs(result[i] - 0.0) < 0.00001);
+        for (int i = 0; i < 10; i++) {
+            assertEquals(0.0, result[i], 0.00001);
         }
     }
 
@@ -225,30 +227,29 @@ public class TestHistogram {
 
         //Should return [0.9,0,0,0,0,0,0,0,0,0,0]
         float [] result = h.filter(PredicateOperator.LESS_THAN, new IntDataBox(9));
-        assert(Math.abs(result[0] - 0.9) < 0.00001);
+        assertEquals(0.9, result[0], 0.00001);
         for (int i = 1; i < 10; i++) {
-            assert(Math.abs(result[i] - 0.0) < 0.00001);
+            assertEquals(0.0, result[i], 0.00001);
         }
 
         //Should return [1.0,0,0,0,0,0,0,0,0,0,0]
         result = h.filter(PredicateOperator.LESS_THAN, new IntDataBox(10));
-        assert(Math.abs(result[0] - 1.0) < 0.00001);
+        assertEquals(1.0, result[0], 0.00001);
         for (int i = 1; i < 10; i++) {
-            assert(Math.abs(result[i] - 0.0) < 0.00001);
+            assertEquals(0.0, result[i], 0.00001);
         }
 
         //Should return [1,1,1,1,1,1,1,1,1,1,1]
         result = h.filter(PredicateOperator.LESS_THAN, new IntDataBox(101));
-        assert(Math.abs(result[0] - 1.0) < 0.00001);
-        for (int i = 1; i < 10; i++) {
-            assert(Math.abs(result[i] - 1.0) < 0.00001);
+        for (int i = 0; i < 10; i++) {
+            assertEquals(1.0, result[i], 0.00001);
         }
 
         //Should return [0,0,0,0,0,0,0,0,0,0,0.0]
         result = h.filter(PredicateOperator.LESS_THAN, new IntDataBox(-1));
-        assert(Math.abs(result[0] - 0.0) < 0.00001);
-        for (int i = 1; i < 10; i++) {
-            assert(Math.abs(result[i] - 0.0) < 0.00001);
+        for (int i = 0; i < 10; i++) {
+            assertEquals(0.0, result[i], 0.00001);
         }
     }
+
 }

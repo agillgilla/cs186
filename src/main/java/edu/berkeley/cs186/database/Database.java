@@ -133,17 +133,20 @@ public class Database implements AutoCloseable {
 
         // TODO(hw5): change to use ARIES recovery manager
         recoveryManager = new DummyRecoveryManager();
-        // recoveryManager = new ARIESRecoveryManager(lockManager.databaseContext(),
-        //         this::beginRecoveryTranscation, this::setTransactionCounter);
+        //recoveryManager = new ARIESRecoveryManager(lockManager.databaseContext(),
+        //        this::beginRecoveryTranscation, this::setTransactionCounter, this::getTransactionCounter);
 
         diskSpaceManager = new DiskSpaceManagerImpl(fileDir, recoveryManager);
         bufferManager = new BufferManagerImpl(diskSpaceManager, recoveryManager, numMemoryPages,
                                               policy);
 
+        if (!initialized) {
+            diskSpaceManager.allocPart(0);
+        }
+
         recoveryManager.setManagers(diskSpaceManager, bufferManager);
 
         if (!initialized) {
-            diskSpaceManager.allocPart(0);
             recoveryManager.initialize();
         }
 
@@ -706,11 +709,19 @@ public class Database implements AutoCloseable {
     }
 
     /**
-     * Updates the transaction number counter.
-     * @param nextTransactionNum transaction number of next transaction
+     * Gets the transaction number counter. This is the number of transactions that
+     * have been created so far, and also the number of the next transaction to be created.
      */
-    private synchronized void setTransactionCounter(long nextTransactionNum) {
-        this.numTransactions = nextTransactionNum;
+    private synchronized long getTransactionCounter() {
+        return this.numTransactions;
+    }
+
+    /**
+     * Updates the transaction number counter.
+     * @param newTransactionCounter new transaction number counter
+     */
+    private synchronized void setTransactionCounter(long newTransactionCounter) {
+        this.numTransactions = newTransactionCounter;
     }
 
     private class TransactionContextImpl extends AbstractTransactionContext {

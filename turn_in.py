@@ -58,7 +58,10 @@ def files_to_copy(assignment):
             'src/main/java/edu/berkeley/cs186/database/table/Table.java',
             'src/main/java/edu/berkeley/cs186/database/Database.java',
         ],
-        'hw5': []
+        'hw5': [
+            'src/main/java/edu/berkeley/cs186/database/recovery/ARIESRecoveryManager.java',
+            'src/test/java/edu/berkeley/cs186/database/recovery/TestARIESStudent.java',
+        ],
     }
     return files[assignment]
 

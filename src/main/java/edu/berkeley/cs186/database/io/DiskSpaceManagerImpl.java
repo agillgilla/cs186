@@ -215,8 +215,9 @@ public class DiskSpaceManagerImpl implements DiskSpaceManager {
             }
 
             if (Bits.getBit(headerBytes, pageIndex) == Bits.Bit.ONE) {
-                throw new PageException("page at (part=" + partNum + ", header=" + headerIndex + ", index=" +
-                                        pageIndex + ") already allocated");
+                throw new IllegalStateException("page at (part=" + partNum + ", header=" + headerIndex + ", index="
+                                                +
+                                                pageIndex + ") already allocated");
             }
 
             Bits.setBit(headerBytes, pageIndex, Bits.Bit.ONE);
@@ -247,11 +248,11 @@ public class DiskSpaceManagerImpl implements DiskSpaceManager {
 
             byte[] headerBytes = headerPages.get(headerIndex);
             if (headerBytes == null) {
-                throw new PageException("cannot free unallocated page");
+                throw new NoSuchElementException("cannot free unallocated page");
             }
 
             if (Bits.getBit(headerBytes, pageIndex) == Bits.Bit.ZERO) {
-                throw new PageException("cannot free unallocated page");
+                throw new NoSuchElementException("cannot free unallocated page");
             }
 
             Bits.setBit(headerBytes, pageIndex, Bits.Bit.ONE);

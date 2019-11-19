@@ -40,7 +40,7 @@ public class DummyRecoveryManager implements RecoveryManager {
     }
 
     @Override
-    public void pageFlushHook(long pageNum, long pageLSN) {}
+    public void pageFlushHook(long pageLSN) {}
 
     @Override
     public void diskIOHook(long pageNum) {}
