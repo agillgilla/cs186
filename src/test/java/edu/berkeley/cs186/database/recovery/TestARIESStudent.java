@@ -1,6 +1,7 @@
 package edu.berkeley.cs186.database.recovery;
 
 import edu.berkeley.cs186.database.TimeoutScaling;
+import edu.berkeley.cs186.database.Transaction;
 import edu.berkeley.cs186.database.categories.HW5Tests;
 import edu.berkeley.cs186.database.categories.StudentTests;
 import edu.berkeley.cs186.database.common.Pair;
@@ -10,10 +11,7 @@ import edu.berkeley.cs186.database.io.DiskSpaceManagerImpl;
 import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.memory.BufferManagerImpl;
 import edu.berkeley.cs186.database.memory.LRUEvictionPolicy;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TemporaryFolder;
@@ -25,6 +23,8 @@ import java.util.function.Consumer;
 
 import static junit.framework.TestCase.assertTrue;
 import static junit.framework.TestCase.fail;
+import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
 
 /**
  * File for student tests for HW5 (Recovery). Tests are run through
@@ -48,6 +48,7 @@ public class TestARIESStudent {
     public void setup() throws Exception {
         testDir = tempFolder.newFolder("test-dir").getAbsolutePath();
         recoveryManager = loadRecoveryManager(testDir);
+        DummyTransaction.cleanupTransactions();
     }
 
     @After
