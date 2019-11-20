@@ -443,9 +443,8 @@ transaction table entirely.
 
 ##### Checkpoint Records
 
-When a BeginCheckpoint record is encountered, the max transaction number and the
-transaction counter both need to be updated (the `updateTransactionCounter`
-function object can be used to update the transaction counter).
+When a BeginCheckpoint record is encountered, the 
+transaction counter needs to be updated (`updateTransactionCounter`).
 
 When an EndCheckpoint record is encountered, the tables stored in the record
 should be combined with the tables currently in memory:
