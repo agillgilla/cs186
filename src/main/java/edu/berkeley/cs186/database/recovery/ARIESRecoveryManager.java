@@ -429,6 +429,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
                     LogRecord endRecord = new EndCheckpointLogRecord(dpt, txnTable, touchedPages);
                     logManager.appendToLog(endRecord);
 
+                    dpt.clear();
                     txnTable.clear();
                     touchedPages.clear();
                     numTouchedPages = 0;
