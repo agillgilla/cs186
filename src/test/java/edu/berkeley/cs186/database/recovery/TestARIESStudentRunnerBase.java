@@ -135,7 +135,7 @@ public abstract class TestARIESStudentRunnerBase {
         }
 
         @Override
-        protected void runUndo(RecoveryManager recoveryManager) {
+        protected void runRedo(RecoveryManager recoveryManager) {
             throw new UnsupportedOperationException("not allowed in testStudentUndo");
         }
     }
@@ -241,17 +241,25 @@ public abstract class TestARIESStudentRunnerBase {
 
         @Override
         protected void shutdownRecoveryManager(RecoveryManager recoveryManager) throws Exception {
-            super.shutdownRecoveryManager(recoveryManager);
+            getLogManager(recoveryManager).close();
+            getBufferManager(recoveryManager).evictAll();
+            getBufferManager(recoveryManager).close();
+            getDiskSpaceManager(recoveryManager).close();
+            DummyTransaction.cleanupTransactions();
         }
 
         @Override
         protected BufferManager getBufferManager(RecoveryManager recoveryManager) throws Exception {
-            return super.getBufferManager(recoveryManager);
+            DelegatedRecoveryManager drm = limited ? ((LimitedRecoveryManager) recoveryManager).inner : ((
+                                               DelegatedRecoveryManager) recoveryManager);
+            return (BufferManager) recoveryManagerClass.getDeclaredField("bufferManager").get(drm.inner);
         }
 
         @Override
         protected DiskSpaceManager getDiskSpaceManager(RecoveryManager recoveryManager) throws Exception {
-            return super.getDiskSpaceManager(recoveryManager);
+            DelegatedRecoveryManager drm = limited ? ((LimitedRecoveryManager) recoveryManager).inner : ((
+                                               DelegatedRecoveryManager) recoveryManager);
+            return (DiskSpaceManager) recoveryManagerClass.getDeclaredField("diskSpaceManager").get(drm.inner);
         }
 
         @Override
