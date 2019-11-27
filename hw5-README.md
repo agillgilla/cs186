@@ -176,7 +176,7 @@ status of running transactions, and log changes in transaction status. The
 recovery manager is notified of changes in transaction status through four
 methods:
 
-- `beginTransaction` is called when a transaction is started (in the `RUNNING`
+- `startTransaction` is called when a transaction is started (in the `RUNNING`
   state), before it can do anything. This is provided for you.
 - `commit` is called when a transaction attempts to move into the `COMMITTING`
   state.
