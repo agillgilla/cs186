@@ -362,7 +362,7 @@ public class TestRecoveryManager {
                                         after))); // 0
         LSNs.add(logManager.appendToLog(new UpdatePageLogRecord(1L, 10000000002L, LSNs.get(0), (short) 0,
                                         before, after))); // 1
-        LSNs.add(logManager.appendToLog(new UpdatePageLogRecord(3L, 10000000003L, LSNs.get(1), (short) 0,
+        LSNs.add(logManager.appendToLog(new UpdatePageLogRecord(3L, 10000000003L, 0L, (short) 0,
                                         before, after))); // 2
         LSNs.add(logManager.appendToLog(new CommitTransactionLogRecord(1L, LSNs.get(2)))); // 3
         LSNs.add(logManager.appendToLog(new EndTransactionLogRecord(1L, LSNs.get(3)))); // 4
@@ -573,14 +573,23 @@ public class TestRecoveryManager {
         byte[] before = new byte[] { (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00 };
         byte[] after = new byte[] { (byte) 0xBA, (byte) 0xAD, (byte) 0xF0, (byte) 0x0D };
 
-        LogManager logManager = getLogManager(recoveryManager);
-        Map<Long, Long> dirtyPageTable = getDirtyPageTable(recoveryManager);
-        Map<Long, TransactionTableEntry> transactionTable = getTransactionTable(recoveryManager);
-
         Transaction transaction1 = DummyTransaction.create(1L);
 
         recoveryManager.startTransaction(transaction1);
         long LSN = recoveryManager.logPageWrite(1L, 10000000001L, (short) 0, before, after);
+
+        // flush everything - recovery tests should always start
+        // with a clean load from disk, and here we want everything sent to disk first.
+        // Note: this does not call RecoveryManager#close - it only closes the
+        // buffer manager and disk space manager.
+        shutdownRecoveryManager(recoveryManager);
+
+        // load from disk again
+        recoveryManager = loadRecoveryManager(testDir);
+
+        LogManager logManager = getLogManager(recoveryManager);
+        Map<Long, Long> dirtyPageTable = getDirtyPageTable(recoveryManager);
+        Map<Long, TransactionTableEntry> transactionTable = getTransactionTable(recoveryManager);
 
         setupRedoChecks(Collections.singletonList(
         (LogRecord record) -> {
@@ -618,8 +627,6 @@ public class TestRecoveryManager {
         byte[] before = new byte[] { (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00 };
         byte[] after = new byte[] { (byte) 0xBA, (byte) 0xAD, (byte) 0xF0, (byte) 0x0D };
 
-        LogManager logManager = getLogManager(recoveryManager);
-
         Transaction transaction1 = DummyTransaction.create(1L);
         recoveryManager.startTransaction(transaction1);
         Transaction transaction2 = DummyTransaction.create(2L);
@@ -637,6 +644,17 @@ public class TestRecoveryManager {
             recoveryManager.logPageWrite(3L, 10000000002L, (short) 0, before, after), // 6
             recoveryManager.abort(2), // 7
         };
+
+        // flush everything - recovery tests should always start
+        // with a clean load from disk, and here we want everything sent to disk first.
+        // Note: this does not call RecoveryManager#close - it only closes the
+        // buffer manager and disk space manager.
+        shutdownRecoveryManager(recoveryManager);
+
+        // load from disk again
+        recoveryManager = loadRecoveryManager(testDir);
+
+        LogManager logManager = getLogManager(recoveryManager);
 
         recoveryManager.restart().run(); // run everything in restart recovery
 
