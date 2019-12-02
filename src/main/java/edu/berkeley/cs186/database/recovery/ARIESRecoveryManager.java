@@ -111,7 +111,18 @@ public class ARIESRecoveryManager implements RecoveryManager {
     @Override
     public long commit(long transNum) {
         // TODO(hw5): implement
-        return -1L;
+        TransactionTableEntry transactionEntry = this.transactionTable.get(transNum);
+
+        LogRecord commitRecord = new CommitTransactionLogRecord(transNum, transactionEntry.lastLSN);
+
+        long newLSN = this.logManager.appendToLog(commitRecord);
+
+        this.logManager.flushToLSN(newLSN);
+
+        transactionEntry.lastLSN = newLSN;
+        transactionEntry.transaction.setStatus(Transaction.Status.COMMITTING);
+
+        return newLSN;
     }
 
     /**
@@ -126,7 +137,17 @@ public class ARIESRecoveryManager implements RecoveryManager {
     @Override
     public long abort(long transNum) {
         // TODO(hw5): implement
-        return -1L;
+
+        TransactionTableEntry transactionEntry = this.transactionTable.get(transNum);
+
+        LogRecord abortRecord = new AbortTransactionLogRecord(transNum, transactionEntry.lastLSN);
+
+        long newLSN = this.logManager.appendToLog(abortRecord);
+
+        transactionEntry.lastLSN = newLSN;
+        transactionEntry.transaction.setStatus(Transaction.Status.ABORTING);
+
+        return newLSN;
     }
 
     /**
