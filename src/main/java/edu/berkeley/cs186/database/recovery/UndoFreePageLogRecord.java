@@ -38,6 +38,11 @@ class UndoFreePageLogRecord extends LogRecord {
     }
 
     @Override
+    public Optional<Long> getUndoNextLSN() {
+        return Optional.of(undoNextLSN);
+    }
+
+    @Override
     public boolean isRedoable() {
         return true;
     }
