@@ -62,6 +62,7 @@ class UndoUpdatePageLogRecord extends LogRecord {
         Page page = bm.fetchPage(new DummyLockContext(), pageNum, false);
         try {
             page.getBuffer().position(offset).put(after);
+            page.setPageLSN(getLSN());
         } finally {
             page.unpin();
         }

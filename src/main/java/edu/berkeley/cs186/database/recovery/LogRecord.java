@@ -4,6 +4,7 @@ import edu.berkeley.cs186.database.Transaction;
 import edu.berkeley.cs186.database.common.Buffer;
 import edu.berkeley.cs186.database.common.Pair;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
+import edu.berkeley.cs186.database.io.PageException;
 import edu.berkeley.cs186.database.memory.BufferManager;
 
 import java.util.*;
@@ -173,7 +174,12 @@ abstract class LogRecord {
      * @throws UnsupportedOperationException if log type is not recognized
      */
     public static Optional<LogRecord> fromBytes(Buffer buf) {
-        int type = buf.get();
+        int type;
+        try {
+            type = buf.get();
+        } catch (PageException e) {
+            return Optional.empty();
+        }
         if (type == 0) {
             return Optional.empty();
         }

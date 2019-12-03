@@ -102,15 +102,19 @@ class LogManagerImpl implements LogManager {
      */
     @Override
     public LogRecord fetchLogRecord(long LSN) {
-        Page logPage = bufferManager.fetchPage(new DummyLockContext(), getLSNPage(LSN), true);
         try {
-            Buffer buf = logPage.getBuffer();
-            buf.position(getLSNIndex(LSN));
-            Optional<LogRecord> record = LogRecord.fromBytes(buf);
-            record.ifPresent((LogRecord e) -> e.setLSN(LSN));
-            return record.orElse(null);
-        } finally {
-            logPage.unpin();
+            Page logPage = bufferManager.fetchPage(new DummyLockContext(), getLSNPage(LSN), true);
+            try {
+                Buffer buf = logPage.getBuffer();
+                buf.position(getLSNIndex(LSN));
+                Optional<LogRecord> record = LogRecord.fromBytes(buf);
+                record.ifPresent((LogRecord e) -> e.setLSN(LSN));
+                return record.orElse(null);
+            } finally {
+                logPage.unpin();
+            }
+        } catch (PageException e) {
+            return null;
         }
     }
 
@@ -273,8 +277,12 @@ class LogManagerImpl implements LogManager {
 
         private LogPagesIterator(long startLSN) {
             nextIndex = getLSNPage(startLSN);
-            Page page = bufferManager.fetchPage(new DummyLockContext(), nextIndex, true);
-            nextIter = new LogPageIterator(page, getLSNIndex(startLSN));
+            try {
+                Page page = bufferManager.fetchPage(new DummyLockContext(), nextIndex, true);
+                nextIter = new LogPageIterator(page, getLSNIndex(startLSN));
+            } catch (PageException e) {
+                nextIter = null;
+            }
         }
 
         @Override

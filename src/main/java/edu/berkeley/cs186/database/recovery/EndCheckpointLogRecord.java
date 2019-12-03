@@ -128,12 +128,13 @@ class EndCheckpointLogRecord extends LogRecord {
         if (!super.equals(o)) { return false; }
         EndCheckpointLogRecord that = (EndCheckpointLogRecord) o;
         return dirtyPageTable.equals(that.dirtyPageTable) &&
-               transactionTable.equals(that.transactionTable);
+               transactionTable.equals(that.transactionTable) &&
+               touchedPages.equals(that.touchedPages);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), dirtyPageTable, transactionTable);
+        return Objects.hash(super.hashCode(), dirtyPageTable, transactionTable, touchedPages);
     }
 
     @Override

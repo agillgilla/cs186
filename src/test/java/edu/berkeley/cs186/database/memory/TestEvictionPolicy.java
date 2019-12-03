@@ -53,6 +53,10 @@ public class TestEvictionPolicy {
         }
 
         @Override
+        void setPageLSN(long pageLSN) {
+        }
+
+        @Override
         BufferFrame requestValidFrame() {
             return null;
         }

@@ -313,7 +313,7 @@ public class BufferManagerImpl implements BufferManager {
             return ranges;
         }
 
-        private void setPageLSN(long pageLSN) {
+        void setPageLSN(long pageLSN) {
             ByteBuffer.wrap(this.contents).putLong(8, pageLSN);
         }
 
@@ -378,6 +378,9 @@ public class BufferManagerImpl implements BufferManager {
         Frame evictedFrame;
         // figure out what frame to load data to, and update manager state
         try {
+            if (!this.diskSpaceManager.pageAllocated(pageNum)) {
+                throw new PageException("page " + pageNum + " not allocated");
+            }
             if (this.pageToFrame.containsKey(pageNum)) {
                 newFrame = this.frames[this.pageToFrame.get(pageNum)];
                 newFrame.pin();

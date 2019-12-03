@@ -601,6 +601,25 @@ public class DiskSpaceManagerImpl implements DiskSpaceManager {
         }
     }
 
+    @Override
+    public boolean pageAllocated(long page) {
+        int partNum = DiskSpaceManager.getPartNum(page);
+        int pageNum = DiskSpaceManager.getPageNum(page);
+        this.managerLock.lock();
+        PartInfo pi;
+        try {
+            pi = getPartInfo(partNum);
+            pi.partitionLock.lock();
+        } finally {
+            this.managerLock.unlock();
+        }
+        try {
+            return !pi.isNotAllocatedPage(pageNum);
+        } finally {
+            pi.partitionLock.unlock();
+        }
+    }
+
     // Gets PartInfo, throws exception if not found.
     private PartInfo getPartInfo(int partNum) {
         PartInfo pi = this.partInfo.get(partNum);

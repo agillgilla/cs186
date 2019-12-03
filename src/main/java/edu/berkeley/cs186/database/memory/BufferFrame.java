@@ -77,6 +77,11 @@ abstract class BufferFrame {
     }
 
     /**
+     * @param pageLSN new pageLSN of the page loaded in this frame
+     */
+    abstract void setPageLSN(long pageLSN);
+
+    /**
      * @return pageLSN of the page loaded in this frame
      */
     abstract long getPageLSN();

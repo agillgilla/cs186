@@ -2,8 +2,10 @@ package edu.berkeley.cs186.database.recovery;
 
 import edu.berkeley.cs186.database.common.Buffer;
 import edu.berkeley.cs186.database.common.ByteBuffer;
+import edu.berkeley.cs186.database.concurrency.DummyLockContext;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
 import edu.berkeley.cs186.database.memory.BufferManager;
+import edu.berkeley.cs186.database.memory.Page;
 
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -53,7 +55,9 @@ class UndoAllocPageLogRecord extends LogRecord {
         super.redo(dsm, bm);
 
         try {
-            dsm.freePage(pageNum);
+            Page p = bm.fetchPage(new DummyLockContext(), pageNum, false);
+            bm.freePage(p);
+            p.unpin();
         } catch (NoSuchElementException e) {
             /* do nothing - page already freed */
         }

@@ -58,6 +58,9 @@ public abstract class TestARIESStudentRunnerBase {
 
         String className = ARIESRecoveryManager.class.getCanonicalName() + getSuffix();
         recoveryManagerClass = (Class<? extends RecoveryManager>) Class.forName(className);
+
+        DummyTransaction.cleanupTransactions();
+        LogRecord.onRedoHandler(t -> {});
     }
 
     private static class AnalysisInstance extends TestInstance {

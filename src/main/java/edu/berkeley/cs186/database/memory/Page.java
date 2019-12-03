@@ -152,6 +152,13 @@ public class Page {
     }
 
     /**
+     * @param pageLSN the new pageLSN of this page - should only be used by recovery
+     */
+    public void setPageLSN(long pageLSN) {
+        this.frame.setPageLSN(pageLSN);
+    }
+
+    /**
      * @return the pageLSN of this page
      */
     public long getPageLSN() {

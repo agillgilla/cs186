@@ -47,6 +47,7 @@ public class TestRecoveryManager {
         testDir = tempFolder.newFolder("test-dir").getAbsolutePath();
         recoveryManager = loadRecoveryManager(testDir);
         DummyTransaction.cleanupTransactions();
+        LogRecord.onRedoHandler(t -> {});
     }
 
     @After
@@ -364,7 +365,7 @@ public class TestRecoveryManager {
                                         before, after))); // 1
         LSNs.add(logManager.appendToLog(new UpdatePageLogRecord(3L, 10000000003L, 0L, (short) 0,
                                         before, after))); // 2
-        LSNs.add(logManager.appendToLog(new CommitTransactionLogRecord(1L, LSNs.get(2)))); // 3
+        LSNs.add(logManager.appendToLog(new CommitTransactionLogRecord(1L, LSNs.get(1)))); // 3
         LSNs.add(logManager.appendToLog(new EndTransactionLogRecord(1L, LSNs.get(3)))); // 4
         LSNs.add(logManager.appendToLog(new FreePageLogRecord(2L, 10000000001L, 0L))); // 5
         LSNs.add(logManager.appendToLog(new AbortTransactionLogRecord(2L, LSNs.get(5)))); // 6

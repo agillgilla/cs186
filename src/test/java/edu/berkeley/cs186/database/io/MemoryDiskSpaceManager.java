@@ -104,4 +104,9 @@ public class MemoryDiskSpaceManager implements DiskSpaceManager {
         }
         System.arraycopy(buf, 0, pages.get(page), 0, DiskSpaceManager.PAGE_SIZE);
     }
+
+    @Override
+    public boolean pageAllocated(long page) {
+        return pages.containsKey(page);
+    }
 }

@@ -66,6 +66,14 @@ public interface DiskSpaceManager extends AutoCloseable {
     void writePage(long page, byte[] buf);
 
     /**
+     * Checks if a page is allocated
+     *
+     * @param page number of page to check
+     * @return true if the page is allocated, false otherwise
+     */
+    boolean pageAllocated(long page);
+
+    /**
      * Gets partition number from virtual page number
      * @param page virtual page number
      * @return partition number

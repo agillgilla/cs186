@@ -49,6 +49,7 @@ public class TestARIESStudent {
         testDir = tempFolder.newFolder("test-dir").getAbsolutePath();
         recoveryManager = loadRecoveryManager(testDir);
         DummyTransaction.cleanupTransactions();
+        LogRecord.onRedoHandler(t -> {});
     }
 
     @After

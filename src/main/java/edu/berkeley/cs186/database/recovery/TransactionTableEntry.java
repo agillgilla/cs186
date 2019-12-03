@@ -39,6 +39,22 @@ class TransactionTableEntry {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) { return true; }
+        if (o == null || getClass() != o.getClass()) { return false; }
+        TransactionTableEntry that = (TransactionTableEntry) o;
+        return lastLSN == that.lastLSN &&
+               Objects.equals(transaction, that.transaction) &&
+               Objects.equals(touchedPages, that.touchedPages) &&
+               Objects.equals(savepoints, that.savepoints);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(transaction, lastLSN, touchedPages, savepoints);
+    }
+
+    @Override
     public String toString() {
         return "TransactionTableEntry{" +
                "transaction=" + transaction +
