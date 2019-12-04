@@ -328,6 +328,8 @@ public class ARIESRecoveryManager implements RecoveryManager {
         long LSN = logManager.appendToLog(record);
         // Update lastLSN, touchedPages
         transactionEntry.lastLSN = LSN;
+        transactionEntry.touchedPages.add(pageNum);
+        dirtyPageTable.remove(pageNum);
         // Flush log
         logManager.flushToLSN(LSN);
         return LSN;

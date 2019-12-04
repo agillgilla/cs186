@@ -217,7 +217,8 @@ public abstract class TestARIESStudentRunnerBase {
 
         @Override
         protected RecoveryManager loadRecoveryManager(String dir) throws Exception {
-            RecoveryManager recoveryManager = new DelegatedRecoveryManager(recoveryManagerConstructor);
+            RecoveryManager recoveryManager = new DelegatedRecoveryManager(recoveryManagerClass,
+                    recoveryManagerConstructor);
             DiskSpaceManager diskSpaceManager = new DiskSpaceManagerImpl(dir, recoveryManager);
             BufferManager bufferManager = new BufferManagerImpl(diskSpaceManager, recoveryManager, 32,
                     new LRUEvictionPolicy());
@@ -432,11 +433,13 @@ public abstract class TestARIESStudentRunnerBase {
     }
 
     private static class DelegatedRecoveryManager implements RecoveryManager {
+        private final Class<? extends RecoveryManager> recoveryManagerClass;
         RecoveryManager inner;
         long transactionCounter = 0L;
 
-        DelegatedRecoveryManager(Constructor<? extends RecoveryManager> recoveryManagerConstructor) throws
-            Exception {
+        DelegatedRecoveryManager(Class<? extends RecoveryManager> recoveryManagerClass,
+                                 Constructor<? extends RecoveryManager> recoveryManagerConstructor) throws Exception {
+            this.recoveryManagerClass = recoveryManagerClass;
             this.inner = recoveryManagerConstructor.newInstance(
                              new DummyLockContext(new Pair<>("database", 0L)),
                              (Function<Long, Transaction>) DummyTransaction::create,
@@ -509,7 +512,18 @@ public abstract class TestARIESStudentRunnerBase {
 
         @Override
         public long logFreePage(long transNum, long pageNum) {
-            return inner.logFreePage(transNum, pageNum);
+            long rv = inner.logFreePage(transNum, pageNum);
+            try {
+                Map<Long, TransactionTableEntry> transactionTable = (Map<Long, TransactionTableEntry>)
+                        recoveryManagerClass.getDeclaredField("transactionTable").get(inner);
+                Map<Long, Long> dirtyPageTable = (Map<Long, Long>)
+                                                 recoveryManagerClass.getDeclaredField("dirtyPageTable").get(inner);
+                transactionTable.get(transNum).touchedPages.add(pageNum);
+                dirtyPageTable.remove(pageNum);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            return rv;
         }
 
         @Override

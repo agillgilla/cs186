@@ -15,4 +15,12 @@ class ARIESRecoveryManagerNoLocking extends ARIESRecoveryManager {
         super.updateTransactionCounter = x -> transactionCounter = x;
         super.getTransactionCounter = () -> transactionCounter;
     }
+
+    @Override
+    public long logFreePage(long transNum, long pageNum) {
+        long rv = super.logFreePage(transNum, pageNum);
+        transactionTable.get(transNum).touchedPages.add(pageNum);
+        dirtyPageTable.remove(pageNum);
+        return rv;
+    }
 }
