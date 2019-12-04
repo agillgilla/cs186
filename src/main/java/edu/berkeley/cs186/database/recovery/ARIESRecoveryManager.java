@@ -164,7 +164,46 @@ public class ARIESRecoveryManager implements RecoveryManager {
     @Override
     public long end(long transNum) {
         // TODO(hw5): implement
-        return -1L;
+
+        TransactionTableEntry transactionEntry = this.transactionTable.get(transNum);
+
+        if (transactionEntry.transaction.getStatus() == Transaction.Status.ABORTING) {
+
+            long currLSN = transactionEntry.lastLSN;
+
+            while (true) {
+                LogRecord currRecord = logManager.fetchLogRecord(currLSN);
+
+                if (currRecord.isUndoable()) {
+                    Pair<LogRecord, Boolean> CLRandFlushRequired = currRecord.undo(currRecord.LSN);
+
+                    LogRecord CLR = CLRandFlushRequired.getFirst();
+                    Boolean flushRequired = CLRandFlushRequired.getSecond();
+
+                    logManager.appendToLog(CLR);
+
+                    if (flushRequired) {
+                        logManager.flushToLSN(CLR.LSN);
+                    }
+                }
+
+                Optional<Long> possiblePrevLSN = currRecord.getPrevLSN();
+                if (possiblePrevLSN.isPresent()) {
+                    currLSN = possiblePrevLSN.get();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        this.transactionTable.remove(transNum);
+
+        LogRecord endRecord = new EndTransactionLogRecord(transNum, transactionEntry.lastLSN);
+        logManager.appendToLog(endRecord);
+
+        transactionEntry.transaction.setStatus(Transaction.Status.COMPLETE);
+
+        return endRecord.LSN;
     }
 
     /**
