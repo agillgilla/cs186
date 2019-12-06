@@ -643,7 +643,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
         restartAnalysis();
 
         restartRedo();
-        
+
         bufferManager.iterPageNums(removeIfNotDirty);
 
         return () -> {

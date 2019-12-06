@@ -21,6 +21,7 @@ import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -703,6 +704,30 @@ public class TestRecoveryManager {
         assertEquals(LogType.BEGIN_CHECKPOINT, iter.next().getType());
         assertEquals(LogType.END_CHECKPOINT, iter.next().getType());
         assertFalse(iter.hasNext());
+    }
+
+    @Test
+    @Category(PublicTests.class)
+    public void testCustomRecoveryAnalysis() throws Exception {
+        assertTrue(false);
+    }
+
+    @Test
+    @Category(PublicTests.class)
+    public void testCustomRestartRedo() throws Exception {
+        assertTrue(false);
+    }
+
+    @Test
+    @Category(PublicTests.class)
+    public void testCustomRestartUndo() throws Exception {
+        assertTrue(false);
+    }
+
+    @Test
+    @Category(PublicTests.class)
+    public void testCustomIntegration() throws Exception {
+        assertTrue(false);
     }
 
     /*************************************************************************
