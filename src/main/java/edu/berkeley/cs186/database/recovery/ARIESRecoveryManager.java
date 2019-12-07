@@ -703,11 +703,16 @@ public class ARIESRecoveryManager implements RecoveryManager {
         // Get start checkpoint LSN
         long LSN = masterRecord.lastCheckpointLSN;
 
+        //System.out.println("SCANNING FROM: " + LSN);
+        System.out.flush();
+
         // TODO(hw5): implement
         Iterator<LogRecord> logIterator = logManager.scanFrom(LSN);
 
         while (logIterator.hasNext()) {
             LogRecord currRecord = logIterator.next();
+
+            //System.out.println("Current log LSN:" + currRecord.getLSN());
 
             Optional<Long> possibleTransNum = currRecord.getTransNum();
             long currTransNum = possibleTransNum.orElse(-1L);
@@ -821,13 +826,12 @@ public class ARIESRecoveryManager implements RecoveryManager {
                         TransactionTableEntry transactionTableEntry = transactionTable.get(transNum);
                         transactionTableEntry.lastLSN = Math.max(transactionTableEntry.lastLSN, currLastLSN);
                     } else {
-                        Transaction transaction = newTransaction.apply(currTransNum);
+                        Transaction transaction = newTransaction.apply(transNum);
                         TransactionTableEntry transactionTableEntry = new TransactionTableEntry(transaction);
 
                         transaction.setStatus(currStatus);
                         transactionTableEntry.lastLSN = currLastLSN;
-
-                        transactionTable.put(currTransNum, transactionTableEntry);
+                        transactionTable.put(transNum, transactionTableEntry);
                     }
                 }
 
@@ -836,7 +840,6 @@ public class ARIESRecoveryManager implements RecoveryManager {
                     TransactionTableEntry transactionTableEntry = transactionTable.get(transNum);
 
                     for (long touchedPageNum : touchedPages.get(transNum)) {
-
                         if (!transactionTableEntry.touchedPages.contains(touchedPageNum)) {
                             transactionTableEntry.touchedPages.add(touchedPageNum);
                         }
@@ -973,8 +976,8 @@ public class ARIESRecoveryManager implements RecoveryManager {
                     logManager.flushToLSN(CLR.LSN);
                 }
 
-                //System.out.println("Undid record with LSN: " + currRecord.LSN);
-                //System.out.println("Setting lastLSN of transaction from: " + transactionTableEntry.lastLSN + " to CLR LSN: " + CLR.LSN);
+                ////System.out.println("Undid record with LSN: " + currRecord.LSN);
+                ////System.out.println("Setting lastLSN of transaction from: " + transactionTableEntry.lastLSN + " to CLR LSN: " + CLR.LSN);
                 transactionTableEntry.lastLSN = CLR.LSN;
                 transactionTable.put(transactionTableEntry.transaction.getTransNum(), transactionTableEntry);
 

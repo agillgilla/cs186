@@ -706,30 +706,6 @@ public class TestRecoveryManager {
         assertFalse(iter.hasNext());
     }
 
-    @Test
-    @Category(PublicTests.class)
-    public void testCustomRecoveryAnalysis() throws Exception {
-        assertTrue(false);
-    }
-
-    @Test
-    @Category(PublicTests.class)
-    public void testCustomRestartRedo() throws Exception {
-        assertTrue(false);
-    }
-
-    @Test
-    @Category(PublicTests.class)
-    public void testCustomRestartUndo() throws Exception {
-        assertTrue(false);
-    }
-
-    @Test
-    @Category(PublicTests.class)
-    public void testCustomIntegration() throws Exception {
-        assertTrue(false);
-    }
-
     /*************************************************************************
      * Helpers - these are similar to the ones available in TestARIESStudent *
      *************************************************************************/
